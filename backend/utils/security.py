@@ -5,7 +5,13 @@ from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer
 
-SECRET_KEY = os.getenv("JWT_SECRET", "dev_secret_change")
+ENV = os.getenv("ENV", "development").lower()
+SECRET_KEY = os.getenv("JWT_SECRET")
+if ENV != "development" and not SECRET_KEY:
+    raise RuntimeError("JWT_SECRET environment variable must be set in non-development environments.")
+# fallback for local dev (explicit)
+if not SECRET_KEY:
+    SECRET_KEY = "dev_secret_change"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 24
 

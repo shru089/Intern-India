@@ -1,12 +1,14 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.security import OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
-from ..database import get_db, Base, engine
-from ..models.user import User, Role
-from ..schemas import UserCreate, Token, UserLogin
-from ..utils.security import (
+from database import get_db
+from models.user import User, Role
+from schemas import UserCreate, Token, UserLogin
+from utils.security import (
     hash_password, verify_password, create_access_token, get_current_user
 )
-from .. import schemas
+from datetime import timedelta
+from config import settings
 
 Base.metadata.create_all(bind=engine)
 

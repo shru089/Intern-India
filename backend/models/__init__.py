@@ -1,4 +1,4 @@
-from .user import User
+from models.user import User
 from .student import StudentProfile
 from .organization import Organization
 from .internship import Internship

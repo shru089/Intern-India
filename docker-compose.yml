@@ -1,4 +1,5 @@
 version: "3.9"
+
 services:
   db:
     image: postgres:15
@@ -13,17 +14,20 @@ services:
 
   backend:
     build: ./backend
-    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
+    working_dir: /app
     environment:
       DATABASE_URL: postgresql://postgres:postgres@db:5432/intern_india
       JWT_SECRET: dev_secret_change
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      PYTHONPATH: /app
+    volumes:
+      - ./backend:/app/backend
+      - ./backend/data:/app/data
     ports:
       - "8000:8000"
+    command: uvicorn backend.main:app --host 0.0.0.0 --port 8000 --reload
     depends_on:
       - db
 
 volumes:
   db_data:
-
-
