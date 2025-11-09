@@ -10,8 +10,8 @@ import os
 from dotenv import load_dotenv
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from ..database import get_db
-from ..models.user import User, UserCreate, UserInDB, PyObjectId
+from backend.database import get_db
+from backend.models.user import User, UserCreate, UserInDB, PyObjectId
 
 load_dotenv()
 
