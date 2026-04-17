@@ -22,8 +22,8 @@ from motor.motor_asyncio import AsyncIOMotorDatabase
 from passlib.context import CryptContext
 from pydantic import BaseModel, EmailStr
 
-from backend.database import get_mongo_db
-from backend.models.user import User, UserCreate, UserInDB
+from ..database import get_mongo_db
+from ..models.user import User, UserCreate, UserInDB
 
 load_dotenv()
 

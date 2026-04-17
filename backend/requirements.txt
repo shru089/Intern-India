@@ -12,6 +12,9 @@ motor>=3.3.0
 pymongo>=4.7.0
 python-dotenv>=1.0.0
 
+# ── Notifications ─────────────────────────────────────────────────────────────
+twilio>=8.0.0              # WhatsApp alerts via Twilio API
+
 # Pydantic v2 (required by FastAPI 0.111+)
 pydantic>=2.7.0
 pydantic[email]>=2.7.0

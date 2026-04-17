@@ -10,8 +10,8 @@ import logging
 import traceback
 from datetime import datetime
 
-from database import MongoDB, get_db
-from routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume
+from backend.database import MongoDB, get_db
+from backend.routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume, notify
 
 app = FastAPI(
     title="Intern-India API",
@@ -74,8 +74,8 @@ async def startup_db_client():
     except Exception as e:
         logger.warning(f"MongoDB not connected (optional): {e}")
 
-    from database import engine, Base
-    import models  # noqa: F401 — registers all models with Base
+    from backend.database import engine, Base
+    import backend.models  # noqa: F401 — registers all models with Base
 
     Base.metadata.create_all(bind=engine)
     logger.info("SQLAlchemy tables created/verified.")
@@ -109,6 +109,7 @@ app.include_router(ai_engine.router, prefix="/ai", tags=["AI Services"], depende
 app.include_router(scraper.router, prefix="/scraper", tags=["Scraper"], dependencies=[Depends(auth.get_current_user)])
 app.include_router(applications.router, prefix="/students", tags=["Applications"], dependencies=[Depends(auth.get_current_user)])
 app.include_router(resume.router, tags=["Resume Parser"])
+app.include_router(notify.router, prefix="/notify", tags=["Notifications"], dependencies=[Depends(auth.get_current_user)])
 
 
 # ── Health check ──────────────────────────────────────────────────────────────
@@ -135,7 +136,7 @@ async def health():
         db_status = "mongodb_connected"
     except Exception:
         try:
-            from database import engine
+            from backend.database import engine
             with engine.connect() as conn:
                 conn.execute(text("SELECT 1"))
             db_status = "sqlite_connected"

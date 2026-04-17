@@ -1,24 +1,16 @@
 """
 User model — Pydantic v2 compatible.
-
-Changes from v1:
-- `__get_validators__` → `__get_pydantic_core_schema__`
-- `class Config` → `model_config = ConfigDict(...)`
-- `allow_population_by_field_name` → `populate_by_name`
-- `json_encoders` moved inside `model_config`
 """
 
 from __future__ import annotations
 
 from datetime import datetime
 from enum import Enum
-from typing import Optional, Annotated, Any
+from typing import Optional, Any
 
 from bson import ObjectId
-from pydantic import BaseModel, EmailStr, Field, GetCoreSchemaHandler
-from pydantic import model_validator
+from pydantic import BaseModel, EmailStr, Field, GetCoreSchemaHandler, ConfigDict
 from pydantic_core import core_schema
-from pydantic import ConfigDict
 
 
 # ── ObjectId validator for Pydantic v2 ───────────────────────────────────────
@@ -49,32 +41,30 @@ class PyObjectId(str):
 # ── Role enum ─────────────────────────────────────────────────────────────────
 
 class Role(str, Enum):
-    student = "student"
+    student      = "student"
     organization = "organization"
-    admin = "admin"
+    admin        = "admin"
 
 
-# ── Base config shared by all user models ─────────────────────────────────────
+# ── Pydantic models ───────────────────────────────────────────────────────────
 
-_user_config = ConfigDict(
+_base_config = ConfigDict(
     use_enum_values=True,
     populate_by_name=True,
     arbitrary_types_allowed=True,
 )
 
 
-# ── Pydantic models ───────────────────────────────────────────────────────────
-
 class UserBase(BaseModel):
-    model_config = _user_config
+    model_config = _base_config
 
-    email: EmailStr
-    full_name: Optional[str] = None
-    role: Role = Role.student
-    is_active: bool = True
-    is_superuser: bool = False
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    updated_at: datetime = Field(default_factory=datetime.utcnow)
+    email:         EmailStr
+    full_name:     Optional[str] = None
+    role:          Role = Role.student
+    is_active:     bool = True
+    is_superuser:  bool = False
+    created_at:    datetime = Field(default_factory=datetime.utcnow)
+    updated_at:    datetime = Field(default_factory=datetime.utcnow)
 
 
 class UserCreate(UserBase):
@@ -82,19 +72,13 @@ class UserCreate(UserBase):
 
 
 class UserInDB(UserBase):
-    id: PyObjectId = Field(default_factory=lambda: PyObjectId(str(ObjectId())), alias="_id")
-    hashed_password: str
+    model_config = _base_config   # reuse — no duplicates
 
-    model_config = ConfigDict(
-        **_user_config,
-        populate_by_name=True,
-    )
+    id:              PyObjectId = Field(default_factory=lambda: PyObjectId(str(ObjectId())), alias="_id")
+    hashed_password: str
 
 
 class User(UserBase):
-    id: PyObjectId = Field(default_factory=lambda: PyObjectId(str(ObjectId())), alias="_id")
+    model_config = _base_config
 
-    model_config = ConfigDict(
-        **_user_config,
-        populate_by_name=True,
-    )
+    id: PyObjectId = Field(default_factory=lambda: PyObjectId(str(ObjectId())), alias="_id")

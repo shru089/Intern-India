@@ -1,6 +1,8 @@
 import os
+import re
+import time
 from datetime import datetime, timedelta, timezone
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Union
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 from passlib.context import CryptContext
@@ -408,3 +410,13 @@ class RateLimiter:
 rate_limiter = RateLimiter(times=10, seconds=60)
 
 
+# ── Simple admin guard (used by routers) ──────────────────────────────────────
+
+async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+    """FastAPI dependency: raises 403 if the user is not an admin."""
+    if current_user.get("role") != "admin" and not current_user.get("is_superuser"):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin privileges required",
+        )
+    return current_user
