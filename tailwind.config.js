@@ -1,46 +1,56 @@
-const { fontFamily } = require("tailwindcss/defaultTheme");
-
-module.exports = {
-  darkMode: "class",
-  mode: "jit",
-  purge: ["./index.html", "./src/**/*.{vue,js,ts,jsx,tsx}"],
+/** @type {import('tailwindcss').Config} */
+export default {
+  content: [
+    "./index.html",
+    "./src/**/*.{js,ts,jsx,tsx}",
+  ],
   theme: {
     extend: {
-      fontFamily: {
-        sans: ["Inter var", ...fontFamily.sans],
-      },
-      borderRadius: {
-        DEFAULT: "8px",
-        secondary: "4px",
-        container: "12px",
-      },
-      boxShadow: {
-        DEFAULT: "0 1px 4px rgba(0, 0, 0, 0.1)",
-        hover: "0 2px 8px rgba(0, 0, 0, 0.12)",
-      },
       colors: {
         primary: {
-          DEFAULT: "#4F46E5",
-          hover: "#4338CA",
+          light: '#67e8f9',
+          DEFAULT: '#06b6d4',
+          dark: '#0e7490',
+          darker: '#155e75',
         },
         secondary: {
-          DEFAULT: "#6B7280",
-          hover: "#4B5563",
+          light: '#fde047',
+          DEFAULT: '#facc15',
+          dark: '#eab308',
         },
-        accent: {
-          DEFAULT: "#8B5CF6",
-          hover: "#7C3AED",
+        neutral: {
+          50: '#f8fafc',
+          100: '#f1f5f9',
+          200: '#e2e8f0',
+          300: '#cbd5e1',
+          400: '#94a3b8',
+          500: '#64748b',
+          600: '#475569',
+          700: '#334155',
+          800: '#1e293b',
+          900: '#0f172a',
         },
+        glass: 'rgba(255, 255, 255, 0.05)',
+        'glass-dark': 'rgba(15, 23, 42, 0.5)',
       },
-      spacing: {
-        "form-field": "16px",
-        section: "32px",
+      fontFamily: {
+        sans: ['Inter', 'sans-serif'],
+      },
+      animation: {
+        'background-pan': 'background-pan 15s ease-in-out infinite',
+        'pulse-slow': 'pulse-slow 8s cubic-bezier(0.4, 0, 0.6, 1) infinite',
+      },
+      keyframes: {
+        'background-pan': {
+          '0%': { backgroundPosition: '0% 50%' },
+          '50%': { backgroundPosition: '100% 50%' },
+          '100%': { backgroundPosition: '0% 50%' },
+        },
+        'pulse-slow': {
+          '50%': { opacity: '.07' },
+        },
       },
     },
   },
-  variants: {
-    extend: {
-      boxShadow: ["hover", "active"],
-    },
-  },
+  plugins: [],
 };

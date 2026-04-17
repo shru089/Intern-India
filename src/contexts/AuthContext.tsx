@@ -1,23 +1,18 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useMemo, ReactNode } from "react";
 import { apiClient } from "../services/api";
+import type { User } from "../types";
 
-interface User {
-  id: number;
-  email: string;
-  name: string | null;
-  role: "student" | "organization" | "admin";
-}
-
-interface AuthContextType {
+interface AuthContextValue {
   user: User | null;
   token: string | null;
-  login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string, name: string, role: string) => Promise<void>;
-  logout: () => void;
   loading: boolean;
+  isAuthenticated: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  register: (userData: { email: string; password: string; fullName: string; role?: string }) => Promise<void>;
+  logout: () => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+const AuthContext = createContext<AuthContextValue | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
@@ -27,7 +22,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (token) {
       apiClient.defaults.headers.common["Authorization"] = `Bearer ${token}`;
-      // Decode token to get user info (simplified - in production decode JWT properly)
       fetchUserInfo();
     } else {
       setLoading(false);
@@ -35,23 +29,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [token]);
 
   async function fetchUserInfo() {
-    // For now, we'll get user info from token or a separate endpoint
-    // In production, decode JWT or call /auth/me
-    setLoading(false);
+    try {
+      const { data } = await apiClient.get<User>("/auth/me");
+      setUser(data);
+    } catch (error) {
+      console.error("Failed to fetch user info", error);
+      logout();
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function login(email: string, password: string) {
-    const { data } = await apiClient.post("/auth/login", { email, password });
+    const { data } = await apiClient.post<{ access_token: string; token_type: string }>(
+      "/auth/login",
+      { email, password }
+    );
     const newToken = data.access_token;
     setToken(newToken);
     localStorage.setItem("token", newToken);
     apiClient.defaults.headers.common["Authorization"] = `Bearer ${newToken}`;
-    // Fetch user info after login
     await fetchUserInfo();
   }
 
-  async function register(email: string, password: string, name: string, role: string) {
-    const { data } = await apiClient.post("/auth/register", { email, password, name, role });
+  async function register(userData: { email: string; password: string; fullName: string; role?: string }) {
+    const { email, password, fullName, role } = userData;
+    const { data } = await apiClient.post<{ access_token: string; token_type: string }>(
+      "/auth/register",
+      { email, password, name: fullName, role }
+    );
     const newToken = data.access_token;
     setToken(newToken);
     localStorage.setItem("token", newToken);
@@ -66,18 +72,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     delete apiClient.defaults.headers.common["Authorization"];
   }
 
-  return (
-    <AuthContext.Provider value={{ user, token, login, register, logout, loading }}>
-      {children}
-    </AuthContext.Provider>
+  const value = useMemo<AuthContextValue>(
+    () => ({ user, token, login, register, logout, loading, isAuthenticated: !!token }),
+    [user, token, loading]
   );
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }
 
-export function useAuth() {
+export function useAuth(): AuthContextValue {
   const context = useContext(AuthContext);
   if (!context) {
     throw new Error("useAuth must be used within AuthProvider");
   }
   return context;
 }
-

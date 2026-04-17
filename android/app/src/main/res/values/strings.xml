@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Intern India</string>
+    <string name="title_activity_main">Intern India</string>
+    <string name="package_name">com.internzen.india</string>
+    <string name="custom_url_scheme">com.internzen.india</string>
+</resources>

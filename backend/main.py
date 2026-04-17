@@ -1,40 +1,43 @@
+import os
 from fastapi import FastAPI, Depends, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.exceptions import RequestValidationError, HTTPException
 from fastapi.responses import JSONResponse
-from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
-from typing import Dict, Any, Optional
+from typing import Optional
+from sqlalchemy import text
 import logging
 import traceback
+from datetime import datetime
 
 from database import MongoDB, get_db
-from routers import auth, students, orgs, admin, ai_engine
-import os
+from routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume
 
 app = FastAPI(
     title="Intern-India API",
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
-# Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-# CORS middleware configuration
+# ── CORS ──────────────────────────────────────────────────────────────────────
+_allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],  # Frontend URL
+    allow_origins=_allowed_origins,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
     expose_headers=["X-Total-Count"],
 )
 
-# Error handling middleware
+
+# ── Error handlers ────────────────────────────────────────────────────────────
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled exception: {str(exc)}\n{traceback.format_exc()}")
@@ -42,6 +45,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
         content={"detail": "Internal server error"},
     )
+
 
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
@@ -51,6 +55,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": exc.errors(), "body": exc.body},
     )
 
+
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
     return JSONResponse(
@@ -59,19 +64,30 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         headers=exc.headers,
     )
 
-# Database connection events
+
+# ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_db_client():
-    # Initialize MongoDB connection
-    await MongoDB.get_database()
-    print("Connected to MongoDB")
+    try:
+        await MongoDB.get_database()
+        logger.info("Connected to MongoDB")
+    except Exception as e:
+        logger.warning(f"MongoDB not connected (optional): {e}")
+
+    from database import engine, Base
+    import models  # noqa: F401 — registers all models with Base
+
+    Base.metadata.create_all(bind=engine)
+    logger.info("SQLAlchemy tables created/verified.")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     await MongoDB.close_connection()
-    print("Closed MongoDB connection")
+    logger.info("Closed MongoDB connection")
 
-# Security headers middleware
+
+# ── Security headers ──────────────────────────────────────────────────────────
 @app.middleware("http")
 async def add_security_headers(request: Request, call_next):
     response = await call_next(request)
@@ -79,52 +95,23 @@ async def add_security_headers(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Content-Security-Policy"] = "default-src 'self'"
+    # Relaxed CSP so the Swagger UI / frontend assets work
+    response.headers["Content-Security-Policy"] = "default-src 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
     return response
 
-# Include routers with security middleware
-app.include_router(
-    auth.router,
-    prefix="/auth",
-    tags=["Authentication"],
-    responses={404: {"description": "Not found"}},
-)
 
-app.include_router(
-    students.router,
-    prefix="/students",
-    tags=["Students"],
-    dependencies=[Depends(auth.get_current_user)],
-    responses={401: {"description": "Unauthorized"}},
-)
+# ── Routers ───────────────────────────────────────────────────────────────────
+app.include_router(auth.router, prefix="/auth", tags=["Authentication"])
+app.include_router(students.router, prefix="/students", tags=["Students"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(orgs.router, prefix="/orgs", tags=["Organizations"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(admin.router, prefix="/admin", tags=["Admin"], dependencies=[Depends(auth.get_current_user), Depends(auth.require_admin)])
+app.include_router(ai_engine.router, prefix="/ai", tags=["AI Services"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(scraper.router, prefix="/scraper", tags=["Scraper"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(applications.router, prefix="/students", tags=["Applications"], dependencies=[Depends(auth.get_current_user)])
+app.include_router(resume.router, tags=["Resume Parser"])
 
-app.include_router(
-    orgs.router,
-    prefix="/orgs",
-    tags=["Organizations"],
-    dependencies=[Depends(auth.get_current_user)],
-    responses={401: {"description": "Unauthorized"}},
-)
 
-app.include_router(
-    admin.router,
-    prefix="/admin",
-    tags=["Admin"],
-    dependencies=[Depends(auth.get_current_user), Depends(auth.require_admin)],
-    responses={
-        401: {"description": "Unauthorized"},
-        403: {"description": "Forbidden - Admin access required"}
-    },
-)
-
-app.include_router(
-    ai_engine.router,
-    prefix="/ai",
-    tags=["AI Services"],
-    dependencies=[Depends(auth.get_current_user)],
-    responses={401: {"description": "Unauthorized"}},
-)
-
+# ── Health check ──────────────────────────────────────────────────────────────
 class HealthCheckResponse(BaseModel):
     status: str
     database: str
@@ -133,49 +120,32 @@ class HealthCheckResponse(BaseModel):
     timestamp: str
     error: Optional[str] = None
 
+
 @app.get(
     "/",
     response_model=HealthCheckResponse,
     summary="Health Check",
     description="Check if the API is running and connected to the database",
-    responses={
-        200: {"description": "API is healthy"},
-        503: {"description": "Service unavailable - database connection error"}
-    }
 )
 async def health():
-    """
-    Health check endpoint that verifies:
-    - API is running
-    - Database connection is active
-    - Environment status
-    """
-    from datetime import datetime
-    
+    db_status = "disconnected"
     try:
-        # Test database connection
-        db = await get_db()
-        await db.command('ping')
-        
-        return {
-            "status": "ok",
-            "database": "connected",
-            "version": "0.1.0",
-            "environment": os.getenv("ENV", "development"),
-            "timestamp": datetime.utcnow().isoformat()
-        }
-    except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "error",
-                "database": "disconnected",
-                "version": "0.1.0",
-                "environment": os.getenv("ENV", "development"),
-                "timestamp": datetime.utcnow().isoformat(),
-                "error": str(e)
-            }
-        )
+        db = await MongoDB.get_database()
+        await db.command("ping")
+        db_status = "mongodb_connected"
+    except Exception:
+        try:
+            from database import engine
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            db_status = "sqlite_connected"
+        except Exception as sql_e:
+            logger.error(f"Health check — SQLite also failed: {sql_e}")
 
-
+    return {
+        "status": "ok",
+        "database": db_status,
+        "version": "0.1.0",
+        "environment": os.getenv("ENV", "development"),
+        "timestamp": datetime.utcnow().isoformat(),
+    }

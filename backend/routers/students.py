@@ -1,58 +1,110 @@
-from fastapi import APIRouter, Depends, HTTPException
+"""
+Students router.
+
+Endpoints
+---------
+POST /students/profile         — Create/update the logged-in student's profile
+GET  /students/recommendations — Get AI-ranked internship recommendations
+"""
+
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models import StudentProfile, User, Internship
+from motor.motor_asyncio import AsyncIOMotorDatabase
+
+from ..database import get_db, get_mongo_db
+from ..models import Internship
 from ..schemas.student import StudentProfileCreate, RecommendationList, Recommendation
+from ..routers.auth import get_current_user
+from ..models.user import UserInDB
+from ..services.matching import score_internship
 
 router = APIRouter()
 
 
+# ── Profile ───────────────────────────────────────────────────────────────────
+
 @router.post("/profile")
-def create_or_update_profile(body: StudentProfileCreate, user_id: int = 0, db: Session = Depends(get_db)):
-    # user_id should be read from JWT in production; prototype uses dummy
-    user = db.query(User).filter(User.id == user_id).first()
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-    prof = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
-    skills = ",".join(body.skills)
-    domains = ",".join(body.pref_domains)
-    locs = ",".join(body.pref_locations)
-    if prof:
-        prof.department = body.department
-        prof.skills = skills
-        prof.gpa = body.gpa
-        prof.location = body.location
-        prof.pref_domains = domains
-        prof.pref_locations = locs
-    else:
-        prof = StudentProfile(
-            user_id=user_id,
-            department=body.department,
-            skills=skills,
-            gpa=body.gpa,
-            location=body.location,
-            pref_domains=domains,
-            pref_locations=locs,
-        )
-        db.add(prof)
-    db.commit()
+async def create_or_update_profile(
+    body: StudentProfileCreate,
+    current_user: UserInDB = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_mongo_db),
+):
+    """Create or update the authenticated student's profile in MongoDB."""
+    profile_doc = {
+        "email": current_user.email,
+        "department": body.department,
+        "skills": body.skills,
+        "gpa": body.gpa,
+        "location": body.location,
+        "pref_domains": body.pref_domains,
+        "pref_locations": body.pref_locations,
+    }
+    await db.student_profiles.update_one(
+        {"email": current_user.email},
+        {"$set": profile_doc},
+        upsert=True,
+    )
     return {"ok": True}
 
 
-@router.get("/recommendations", response_model=RecommendationList)
-def recommendations(user_id: int = 0, db: Session = Depends(get_db)):
-    prof = db.query(StudentProfile).filter(StudentProfile.user_id == user_id).first()
+@router.get("/profile")
+async def get_profile(
+    current_user: UserInDB = Depends(get_current_user),
+    db: AsyncIOMotorDatabase = Depends(get_mongo_db),
+):
+    """Return the authenticated student's profile."""
+    prof = await db.student_profiles.find_one({"email": current_user.email})
     if not prof:
-        return RecommendationList(items=[])
-    prof_skills = set([s.strip().lower() for s in (prof.skills or "").split(",") if s])
-    items: list[Recommendation] = []
-    for job in db.query(Internship).all():
-        req = set([s.strip().lower() for s in (job.required_skills or "").split(",") if s])
-        overlap = len(prof_skills & req)
-        denom = max(len(req), 1)
-        skill_score = overlap / denom
-        items.append(Recommendation(internship_id=job.id, title=job.title, organization=None, match_score=round(skill_score * 100, 2)))
-    items.sort(key=lambda x: x.match_score, reverse=True)
-    return RecommendationList(items=items[:10])
+        raise HTTPException(status_code=404, detail="Profile not found — please complete onboarding.")
+    prof["_id"] = str(prof["_id"])
+    return prof
 
 
+# ── Recommendations ───────────────────────────────────────────────────────────
+
+@router.get("/recommendations", response_model=RecommendationList)
+async def recommendations(
+    page: int = Query(1, ge=1),
+    page_size: int = Query(10, ge=1, le=100),
+    current_user: UserInDB = Depends(get_current_user),
+    mongo: AsyncIOMotorDatabase = Depends(get_mongo_db),
+    sqlite: Session = Depends(get_db),
+):
+    """
+    Returns internship recommendations for the authenticated user,
+    ranked by the AI match score.  Falls back gracefully if no profile exists.
+    """
+    prof = await mongo.student_profiles.find_one({"email": current_user.email})
+    if not prof:
+        return RecommendationList(items=[], total=0, page=page, page_size=page_size)
+
+    all_internships = sqlite.query(Internship).all()
+
+    scored_items = []
+    for job in all_internships:
+        match_score = score_internship(prof, job)
+        scored_items.append(
+            Recommendation(
+                internship_id=job.id,
+                title=job.title,
+                organization=job.company_name,
+                location=job.location,
+                source=job.source,
+                source_url=job.source_url,
+                domain=job.domain,
+                stipend=job.stipend,
+                duration_months=job.duration_months,
+                match_score=match_score,
+            )
+        )
+
+    scored_items.sort(key=lambda x: x.match_score, reverse=True)
+
+    total = len(scored_items)
+    start = (page - 1) * page_size
+    end = start + page_size
+    paginated_items = scored_items[start:end]
+
+    return RecommendationList(
+        items=paginated_items, total=total, page=page, page_size=page_size
+    )
