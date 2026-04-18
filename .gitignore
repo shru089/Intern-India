@@ -85,3 +85,28 @@ android/.idea/
 # ── Misc ──────────────────────────────────────────────────────────────────────
 scratch/
 .kilo/
+# -- Android Secrets & Local Configs ------------------------------------------
+android/local.properties
+android/app/google-services.json
+*.keystore
+*.jks
+
+# -- Web Build & Cache --------------------------------------------------------
+.parcel-cache/
+.npm/
+.turbo/
+.vercel/
+.next/
+.serverless/
+.terragrunt-cache/
+.terraform/
+
+# -- Extension & Backup Junk --------------------------------------------------
+.history/
+*.bak
+*.tmp
+*.temp
+~*
+.project
+.pydevproject
+.settings/
