@@ -7,7 +7,7 @@ class Application(Base):
     __tablename__ = "applications"
 
     id = Column(Integer, primary_key=True)
-    student_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    student_id = Column(String, nullable=False, index=True)
     student_email = Column(
         String, nullable=True, index=True
     )  # Store email for easier lookup
