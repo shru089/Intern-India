@@ -37,11 +37,6 @@ env/
 .env.*.local
 backend/.env
 
-# ── Node / Frontend ───────────────────────────────────────────────────────────
-node_modules/
-dist/
-dist-ssr/
-*.local
 
 # ── Logs ─────────────────────────────────────────────────────────────────────
 logs/
@@ -74,32 +69,11 @@ Thumbs.db
 # ── Jupyter ───────────────────────────────────────────────────────────────────
 .ipynb_checkpoints/
 
-# ── Capacitor / Android ───────────────────────────────────────────────────────
-android/.gradle/
-android/build/
-android/app/build/
-android/.idea/
-*.apk
-*.aab
 
 # ── Misc ──────────────────────────────────────────────────────────────────────
 scratch/
 .kilo/
-# -- Android Secrets & Local Configs ------------------------------------------
-android/local.properties
-android/app/google-services.json
-*.keystore
-*.jks
 
-# -- Web Build & Cache --------------------------------------------------------
-.parcel-cache/
-.npm/
-.turbo/
-.vercel/
-.next/
-.serverless/
-.terragrunt-cache/
-.terraform/
 
 # -- Extension & Backup Junk --------------------------------------------------
 .history/

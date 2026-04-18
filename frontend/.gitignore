@@ -1,0 +1,29 @@
+# ── Node / Frontend ───────────────────────────────────────────────────────────
+node_modules/
+dist/
+dist-ssr/
+*.local
+
+# ── Capacitor / Android ───────────────────────────────────────────────────────
+android/.gradle/
+android/build/
+android/app/build/
+android/.idea/
+*.apk
+*.aab
+
+# -- Android Secrets & Local Configs ------------------------------------------
+android/local.properties
+android/app/google-services.json
+*.keystore
+*.jks
+
+# -- Web Build & Cache --------------------------------------------------------
+.parcel-cache/
+.npm/
+.turbo/
+.vercel/
+.next/
+.serverless/
+.terragrunt-cache/
+.terraform/
