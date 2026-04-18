@@ -1,13 +1,18 @@
 import os
 import re
 import time
+import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple, Union
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 from passlib.context import CryptContext
 from fastapi import Depends, HTTPException, status, Request, Security
-from fastapi.security import OAuth2PasswordBearer, HTTPBearer, HTTPAuthorizationCredentials
+from fastapi.security import (
+    OAuth2PasswordBearer,
+    HTTPBearer,
+    HTTPAuthorizationCredentials,
+)
 from motor.motor_asyncio import AsyncIOMotorDatabase
 from pydantic import BaseModel, Field, validator
 from bson import ObjectId
@@ -15,6 +20,9 @@ import logging
 import hashlib
 import hmac
 from functools import lru_cache
+from cryptography.fernet import Fernet
+from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
@@ -23,6 +31,7 @@ from ..database import get_mongo_db as get_db
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # Security configuration
 @lru_cache()
@@ -36,14 +45,63 @@ def get_secret_key() -> str:
         return "dev-secret-key-change-in-production"
     return secret
 
+
 # Security constants
 ALGORITHM = os.getenv("ALGORITHM", "HS256")
-ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
+ACCESS_TOKEN_EXPIRE_MINUTES = int(
+    os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440")
+)  # 24 hours
 REFRESH_TOKEN_EXPIRE_DAYS = int(os.getenv("REFRESH_TOKEN_EXPIRE_DAYS", "7"))
 PASSWORD_MIN_LENGTH = 12
 PASSWORD_MAX_ATTEMPTS = 5
 PASSWORD_LOCKOUT_TIME = 300  # 5 minutes in seconds
 RATE_LIMIT = "1000/day;100/hour;10/minute"
+
+
+# Data encryption for sensitive information
+@lru_cache()
+def get_encryption_key() -> bytes:
+    """Generate encryption key from secret key for data encryption."""
+    secret = get_secret_key()
+    salt = b"intern_india_data_salt"  # Fixed salt for consistent encryption
+    kdf = PBKDF2HMAC(
+        algorithm=hashes.SHA256(),
+        length=32,
+        salt=salt,
+        iterations=100000,
+    )
+    return base64.urlsafe_b64encode(kdf.derive(secret.encode()))
+
+
+@lru_cache()
+def get_fernet() -> Fernet:
+    """Get Fernet instance for encryption/decryption."""
+    key = get_encryption_key()
+    return Fernet(key)
+
+
+def encrypt_sensitive_data(data: str) -> str:
+    """Encrypt sensitive data like resume content."""
+    if not data:
+        return ""
+    fernet = get_fernet()
+    encrypted = fernet.encrypt(data.encode())
+    return base64.urlsafe_b64encode(encrypted).decode()
+
+
+def decrypt_sensitive_data(encrypted_data: str) -> str:
+    """Decrypt sensitive data."""
+    if not encrypted_data:
+        return ""
+    try:
+        fernet = get_fernet()
+        encrypted = base64.urlsafe_b64decode(encrypted_data.encode())
+        decrypted = fernet.decrypt(encrypted)
+        return decrypted.decode()
+    except Exception as e:
+        logger.error(f"Failed to decrypt data: {e}")
+        return ""
+
 
 # Rate limiter
 limiter = Limiter(key_func=get_remote_address)
@@ -58,13 +116,12 @@ pwd_context = CryptContext(
 
 # OAuth2 scheme
 oauth2_scheme = OAuth2PasswordBearer(
-    tokenUrl="auth/token",
-    auto_error=False,
-    scheme_name="JWT"
+    tokenUrl="auth/token", auto_error=False, scheme_name="JWT"
 )
 
 # Rate limiting for auth endpoints
 login_limiter = Limiter(key_func=get_remote_address)
+
 
 # Password policy
 class PasswordPolicy:
@@ -72,7 +129,10 @@ class PasswordPolicy:
     def validate_password_strength(password: str) -> Tuple[bool, str]:
         """Enforce strong password policy."""
         if len(password) < PASSWORD_MIN_LENGTH:
-            return False, f"Password must be at least {PASSWORD_MIN_LENGTH} characters long"
+            return (
+                False,
+                f"Password must be at least {PASSWORD_MIN_LENGTH} characters long",
+            )
         if not re.search(r"[A-Z]", password):
             return False, "Password must contain at least one uppercase letter"
         if not re.search(r"[a-z]", password):
@@ -83,6 +143,7 @@ class PasswordPolicy:
             return False, "Password must contain at least one special character"
         return True, ""
 
+
 # Token models
 class TokenPayload(BaseModel):
     sub: str  # user ID
@@ -91,6 +152,7 @@ class TokenPayload(BaseModel):
     scopes: List[str] = []
     jti: str  # Unique token identifier
 
+
 class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
@@ -98,14 +160,17 @@ class TokenResponse(BaseModel):
     refresh_token: str
     refresh_expires_in: int
 
+
 # Password hashing and verification
 def get_password_hash(password: str) -> str:
     """Generate a secure password hash with a random salt."""
     return pwd_context.hash(password)
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash using constant-time comparison."""
     return pwd_context.verify(plain_password, hashed_password)
+
 
 # Token creation and validation
 def create_jwt_token(
@@ -126,7 +191,7 @@ def create_jwt_token(
 
     # Generate a unique token ID
     jti = hashlib.sha256(f"{subject}{now.timestamp()}".encode()).hexdigest()
-    
+
     to_encode = {
         "sub": subject,
         "exp": expire,
@@ -134,7 +199,7 @@ def create_jwt_token(
         "type": token_type,
         "jti": jti,
     }
-    
+
     if scopes:
         to_encode["scopes"] = scopes
 
@@ -144,41 +209,47 @@ def create_jwt_token(
         algorithm=ALGORITHM,
     )
 
+
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     """Verify a password against a hash."""
     return pwd_context.verify(plain_password, hashed_password)
 
+
 # Token utilities
 def create_access_token(
-    subject: Union[str, ObjectId], 
+    subject: Union[str, ObjectId],
     token_type: str = "access",
     expires_delta: Optional[timedelta] = None,
     role: Optional[str] = None,
-    scopes: Optional[list[str]] = None
+    scopes: Optional[list[str]] = None,
 ) -> str:
     """Create a new JWT token."""
     expire = datetime.now(timezone.utc) + (
         expires_delta or timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     )
-    
+
     to_encode = {
         "sub": str(subject),
         "exp": expire,
         "type": token_type,
         "iat": datetime.now(timezone.utc),
     }
-    
+
     if role:
         to_encode["role"] = role
     if scopes:
         to_encode["scopes"] = scopes
-    
+
     return jwt.encode(to_encode, get_secret_key(), algorithm=ALGORITHM)
 
-def create_refresh_token(subject: Union[str, ObjectId], role: Optional[str] = None) -> str:
+
+def create_refresh_token(
+    subject: Union[str, ObjectId], role: Optional[str] = None
+) -> str:
     """Create a refresh token with longer expiration."""
     expires_delta = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
     return create_access_token(subject, "refresh", expires_delta, role)
+
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
@@ -186,14 +257,14 @@ async def get_current_user(
 ) -> Dict[str, Any]:
     """
     Dependency to get the current user from the JWT token.
-    
+
     Args:
         credentials: The HTTP Authorization header containing the JWT token
         db: The database connection
-        
+
     Returns:
         The authenticated user's data
-        
+
     Raises:
         HTTPException: If the token is invalid, expired, or the user doesn't exist
     """
@@ -203,9 +274,9 @@ async def get_current_user(
             detail="Not authenticated",
             headers={"WWW-Authenticate": "Bearer"},
         )
-        
+
     token = credentials.credentials
-    
+
     try:
         # Verify the token
         payload = jwt.decode(
@@ -214,14 +285,14 @@ async def get_current_user(
             algorithms=[ALGORITHM],
             options={"require": ["exp", "iat", "sub", "type", "jti"]},
         )
-        
+
         # Validate token type
         if payload.get("type") != "access":
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Invalid token type",
             )
-            
+
         # Check if token is blacklisted
         user_id = payload.get("sub")
         if await is_token_blacklisted(user_id, payload.get("jti"), db):
@@ -229,7 +300,7 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Token has been revoked",
             )
-        
+
         # Get user from database
         user = await db.users.find_one({"_id": ObjectId(user_id)})
         if not user:
@@ -237,16 +308,16 @@ async def get_current_user(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
-            
+
         # Check if user is active
         if not user.get("is_active", True):
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is disabled",
             )
-            
+
         return user
-        
+
     except ExpiredSignatureError:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -261,19 +332,21 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
-async def is_token_blacklisted(user_id: str, jti: str, db: AsyncIOMotorDatabase) -> bool:
+
+async def is_token_blacklisted(
+    user_id: str, jti: str, db: AsyncIOMotorDatabase
+) -> bool:
     """Check if a token is blacklisted."""
     if not user_id or not jti:
         return True
-        
+
     # Check if token is in the blacklist
-    blacklisted = await db.token_blacklist.find_one({
-        "user_id": user_id,
-        "jti": jti,
-        "expires_at": {"$gt": datetime.utcnow()}
-    })
-    
+    blacklisted = await db.token_blacklist.find_one(
+        {"user_id": user_id, "jti": jti, "expires_at": {"$gt": datetime.utcnow()}}
+    )
+
     return blacklisted is not None
+
 
 # Role-based access control
 class RoleChecker:
@@ -283,21 +356,20 @@ class RoleChecker:
     async def __call__(self, user: Dict[str, Any] = Depends(get_current_user)) -> bool:
         """
         Check if the current user has the required role.
-        
+
         Args:
             user: The authenticated user's data
-            
+
         Returns:
             bool: True if the user has the required role
-            
+
         Raises:
             HTTPException: If the user doesn't have the required role
         """
         if user.get("role") not in self.allowed_roles:
             logger.warning(f"Unauthorized access attempt by user: {user.get('_id')}")
             raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Operation not permitted"
+                status_code=status.HTTP_403_FORBIDDEN, detail="Operation not permitted"
             )
         return True
 
@@ -305,13 +377,13 @@ class RoleChecker:
     async def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> bool:
         """
         Check if the current user is an admin.
-        
+
         Args:
             user: The authenticated user's data
-            
+
         Returns:
             bool: True if the user is an admin
-            
+
         Raises:
             HTTPException: If the user is not an admin
         """
@@ -319,101 +391,227 @@ class RoleChecker:
             logger.warning(f"Admin access denied for user: {user.get('_id')}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail="Admin privileges required"
+                detail="Admin privileges required",
             )
         return True
+
 
 # Rate limiting utilities
 class RateLimiter:
     """In-memory rate limiter (replace with Redis in production)."""
+
     _instance = None
     _rate_limits = {}
-    
+
     def __new__(cls):
         if cls._instance is None:
             cls._instance = super(RateLimiter, cls).__new__(cls)
         return cls._instance
-    
+
     async def is_rate_limited(
-        self,
-        key: str,
-        limit: int,
-        window: int
+        self, key: str, limit: int, window: int
     ) -> Tuple[bool, Dict[str, Any]]:
         """Check if a request should be rate limited."""
         now = time.time()
         window_start = now - window
-        
+
         # Clean up old entries
         if key in self._rate_limits:
-            self._rate_limits[key] = [t for t in self._rate_limits[key] if t > window_start]
+            self._rate_limits[key] = [
+                t for t in self._rate_limits[key] if t > window_start
+            ]
         else:
             self._rate_limits[key] = []
-        
+
         # Check rate limit
         if len(self._rate_limits[key]) >= limit:
             return True, {
                 "limit": limit,
                 "remaining": 0,
-                "reset": int(self._rate_limits[key][0] + window)
+                "reset": int(self._rate_limits[key][0] + window),
             }
-        
+
         # Add current request
         self._rate_limits[key].append(now)
-        
+
         return False, {
             "limit": limit,
             "remaining": limit - len(self._rate_limits[key]),
-            "reset": int(now + window)
+            "reset": int(now + window),
         }
+
 
 # Initialize rate limiter
 rate_limiter = RateLimiter()
+
 
 def get_rate_limiter() -> RateLimiter:
     """Dependency to get the rate limiter instance."""
     return rate_limiter
 
+
 # Example: Create role-based dependencies
 admin_required = RoleChecker(["admin"])
 org_admin_required = RoleChecker(["org_admin", "admin"])
 any_auth_user = RoleChecker(["user", "org_admin", "admin"])
+
+
 # Rate limiting (example implementation)
 class RateLimiter:
     def __init__(self, times: int, seconds: int):
         self.times = times
         self.seconds = seconds
         self.requests = {}
-    
+
     async def __call__(self, request: Request) -> bool:
         client_host = request.client.host
         now = datetime.now(timezone.utc)
-        
+
         if client_host not in self.requests:
             self.requests[client_host] = []
-        
+
         # Remove old timestamps
         self.requests[client_host] = [
-            ts for ts in self.requests[client_host]
+            ts
+            for ts in self.requests[client_host]
             if (now - ts).seconds <= self.seconds
         ]
-        
+
         if len(self.requests[client_host]) >= self.times:
             raise HTTPException(
                 status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                detail="Too many requests"
+                detail="Too many requests",
             )
-        
+
         self.requests[client_host].append(now)
         return True
+
 
 # Example rate limiter (10 requests per minute)
 rate_limiter = RateLimiter(times=10, seconds=60)
 
 
+# Security audit utilities
+class SecurityAuditor:
+    """Basic security checks for common vulnerabilities."""
+
+    @staticmethod
+    def validate_file_upload(
+        file_content: bytes, filename: str, max_size: int = 10 * 1024 * 1024
+    ) -> Tuple[bool, str]:
+        """Validate uploaded file for security issues."""
+        # Check file size
+        if len(file_content) > max_size:
+            return False, f"File too large. Maximum size: {max_size} bytes"
+
+        # Check file extension
+        allowed_extensions = {".pdf", ".docx", ".txt"}
+        if not any(filename.lower().endswith(ext) for ext in allowed_extensions):
+            return False, "Invalid file type. Allowed: PDF, DOCX, TXT"
+
+        # Basic content checks
+        if b"<script" in file_content.lower() or b"javascript:" in file_content.lower():
+            return False, "Potentially malicious content detected"
+
+        return True, "File is safe"
+
+    @staticmethod
+    def sanitize_input(text: str) -> str:
+        """Basic input sanitization."""
+        if not text:
+            return ""
+        # Remove potential script tags
+        text = re.sub(r"<[^>]+>", "", text)
+        # Limit length
+        return text[:1000] if len(text) > 1000 else text
+
+    @staticmethod
+    def audit_jwt_token(token: str) -> Dict[str, Any]:
+        """Audit JWT token for security issues."""
+        try:
+            # Decode without verification to check structure
+            header = jwt.get_unverified_header(token)
+            claims = jwt.get_unverified_claims(token)
+
+            issues = []
+
+            # Check algorithm
+            if header.get("alg") not in ["HS256", "RS256"]:
+                issues.append("Weak or unusual algorithm")
+
+            # Check expiration
+            exp = claims.get("exp")
+            if exp and exp < time.time():
+                issues.append("Token expired")
+
+            # Check issuer (if present)
+            iss = claims.get("iss")
+            if iss and iss != "intern-india":
+                issues.append("Invalid issuer")
+
+            return {
+                "valid_structure": True,
+                "algorithm": header.get("alg"),
+                "expires_at": exp,
+                "issues": issues,
+            }
+
+        except Exception as e:
+            return {
+                "valid_structure": False,
+                "error": str(e),
+                "issues": ["Invalid JWT structure"],
+            }
+
+
+# Initialize security auditor
+security_auditor = SecurityAuditor()
+
+
+# Security audit endpoint for admins
+def audit_api_endpoints() -> Dict[str, Any]:
+    """Audit API endpoints for common security issues."""
+    from ..main import app
+
+    issues = []
+
+    for route in app.routes:
+        if hasattr(route, "methods") and hasattr(route, "path"):
+            path = route.path
+            methods = list(route.methods)
+
+            # Check for insecure HTTP methods
+            if "PUT" in methods or "DELETE" in methods:
+                if not any(word in path for word in ["auth", "admin", "protected"]):
+                    issues.append(
+                        f"Potentially insecure method on public endpoint: {methods} {path}"
+                    )
+
+            # Check for missing auth on sensitive endpoints
+            sensitive_keywords = ["profile", "resume", "application", "admin"]
+            if any(keyword in path for keyword in sensitive_keywords):
+                # This would need more sophisticated checking of dependencies
+                pass
+
+    return {
+        "total_routes": len(app.routes),
+        "security_issues": issues,
+        "recommendations": [
+            "Implement rate limiting on all endpoints",
+            "Add input validation and sanitization",
+            "Use HTTPS in production",
+            "Regular security audits",
+            "Implement proper CORS policies",
+        ],
+    }
+
+
 # ── Simple admin guard (used by routers) ──────────────────────────────────────
 
-async def require_admin(current_user: Dict[str, Any] = Depends(get_current_user)) -> Dict[str, Any]:
+
+async def require_admin(
+    current_user: Dict[str, Any] = Depends(get_current_user),
+) -> Dict[str, Any]:
     """FastAPI dependency: raises 403 if the user is not an admin."""
     if current_user.get("role") != "admin" and not current_user.get("is_superuser"):
         raise HTTPException(

@@ -18,7 +18,7 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
 from ..database import get_db, get_mongo_db
-from ..models import Internship
+from ..models import Internship, Application
 from ..routers.auth import get_current_user
 from ..models.user import UserInDB, Role
 from ..services.matching import score_internship
@@ -29,12 +29,13 @@ router = APIRouter()
 
 # ── Request / Response schemas ────────────────────────────────────────────────
 
+
 class InternshipPost(BaseModel):
     title: str
     company_name: str
     location: str
     domain: str
-    required_skills: str          # comma-separated
+    required_skills: str  # comma-separated
     stipend: Optional[str] = "Unpaid"
     duration_months: Optional[int] = 2
     description: Optional[str] = None
@@ -68,10 +69,30 @@ class TopMatch(BaseModel):
     pref_domains: list[str]
 
 
+class ApplicationForOrg(BaseModel):
+    id: int
+    internship_id: int
+    internship_title: str
+    student_email: str
+    student_name: Optional[str]
+    status: str
+    apply_method: str
+    applied_at: str
+    notes: Optional[str]
+
+
 # ── Guard: only org / admin users ─────────────────────────────────────────────
 
-def require_org_or_admin(current_user: UserInDB = Depends(get_current_user)) -> UserInDB:
-    if current_user.role not in (Role.organization, Role.admin, "organization", "admin"):
+
+def require_org_or_admin(
+    current_user: UserInDB = Depends(get_current_user),
+) -> UserInDB:
+    if current_user.role not in (
+        Role.organization,
+        Role.admin,
+        "organization",
+        "admin",
+    ):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Only organization accounts can access this endpoint.",
@@ -80,6 +101,7 @@ def require_org_or_admin(current_user: UserInDB = Depends(get_current_user)) -> 
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @router.post("/internships", response_model=InternshipResponse, status_code=201)
 def post_internship(
@@ -162,6 +184,58 @@ async def top_matches_for_role(
     return scored[:top_n]
 
 
+@router.get("/applications", response_model=list[ApplicationForOrg])
+async def get_applications_for_my_internships(
+    status: Optional[str] = None,
+    db: Session = Depends(get_db),
+    mongo: AsyncIOMotorDatabase = Depends(get_mongo_db),
+    current_user: UserInDB = Depends(require_org_or_admin),
+    page: int = Query(1, ge=1),
+    page_size: int = Query(20, ge=1, le=100),
+):
+    """Get all applications to internships posted by this organization."""
+    # Get all internship IDs posted by this org (source == "org_portal")
+    internship_ids = (
+        db.query(Internship.id).filter(Internship.source == "org_portal").subquery()
+    )
+
+    # Get applications for these internships
+    query = (
+        db.query(Application, Internship.title)
+        .join(Internship, Application.internship_id == Internship.id)
+        .filter(Internship.id.in_(internship_ids))
+    )
+
+    if status:
+        query = query.filter(Application.status == status)
+
+    applications = query.offset((page - 1) * page_size).limit(page_size).all()
+
+    result = []
+    for app, internship_title in applications:
+        # Get student name from MongoDB using email
+        student_profile = await mongo.student_profiles.find_one(
+            {"email": app.student_email}
+        )
+        student_name = student_profile.get("full_name") if student_profile else None
+
+        result.append(
+            ApplicationForOrg(
+                id=app.id,
+                internship_id=app.internship_id,
+                internship_title=internship_title,
+                student_email=app.student_email,
+                student_name=student_name,
+                status=app.status,
+                apply_method=app.apply_method,
+                applied_at=app.applied_at.isoformat(),
+                notes=app.notes,
+            )
+        )
+
+    return result
+
+
 @router.get("/dashboard")
 async def org_dashboard(
     db: Session = Depends(get_db),
@@ -174,6 +248,7 @@ async def org_dashboard(
 
     # Aggregate required skills across org's listings
     from collections import Counter
+
     skill_counter: Counter = Counter()
     for job in listings:
         for sk in (job.required_skills or "").split(","):
@@ -183,9 +258,39 @@ async def org_dashboard(
 
     top_skills = [{"skill": k, "count": v} for k, v in skill_counter.most_common(10)]
 
+    # Get application stats
+    internship_ids = [j.id for j in listings]
+    total_applications = 0
+    applications_by_status = {}
+
+    if internship_ids:
+        from sqlalchemy import func
+
+        app_stats = (
+            db.query(Application.status, func.count(Application.id))
+            .filter(Application.internship_id.in_(internship_ids))
+            .group_by(Application.status)
+            .all()
+        )
+
+        for status_val, count in app_stats:
+            applications_by_status[status_val] = count
+            total_applications += count
+
     return {
         "total_listings": len(listings),
         "total_students_on_platform": total_students,
+        "total_applications": total_applications,
+        "applications_by_status": applications_by_status,
         "top_skills_in_demand": top_skills,
         "domains": list({j.domain for j in listings if j.domain}),
+        "recent_listings": [
+            {
+                "id": j.id,
+                "title": j.title,
+                "posted_at": j.posted_at,
+                "location": j.location,
+            }
+            for j in sorted(listings, key=lambda x: x.posted_at or "", reverse=True)[:5]
+        ],
     }

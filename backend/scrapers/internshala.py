@@ -15,10 +15,7 @@ Key selectors (verified live on 2026-04-15):
   Posted:  .status-success or .status-info
 """
 
-import time
-import random
 import logging
-import requests
 from datetime import datetime
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any
@@ -64,13 +61,13 @@ class InternshalaScraper(BaseScraper):
         delay_range: tuple = (2, 5),
         max_retries: int = 3,
     ):
-        super().__init__(source_name="internshala")
+        super().__init__(
+            source_name="internshala", max_retries=max_retries, delay_range=delay_range
+        )
         self.pages = pages
         self.category = category
         self.location = location
         self.work_from_home = work_from_home
-        self.delay_range = delay_range
-        self.max_retries = max_retries
 
     def _build_url(self, page: int = 1) -> str:
         """Build the listings URL with optional filters."""
@@ -92,26 +89,9 @@ class InternshalaScraper(BaseScraper):
 
     def _fetch_page(self, url: str) -> BeautifulSoup | None:
         """Fetch a page with retry logic and return a BeautifulSoup object."""
-        last_error = None
-        for attempt in range(self.max_retries):
-            try:
-                logger.info(
-                    f"Fetching (attempt {attempt + 1}/{self.max_retries}): {url}"
-                )
-                response = requests.get(url, headers=HEADERS, timeout=15)
-                response.raise_for_status()
-                return BeautifulSoup(response.text, "html.parser")
-            except requests.RequestException as e:
-                last_error = e
-                logger.warning(f"Attempt {attempt + 1} failed for {url}: {e}")
-                if attempt < self.max_retries - 1:
-                    wait_time = (attempt + 1) * 3
-                    logger.info(f"Retrying in {wait_time} seconds...")
-                    time.sleep(wait_time)
-
-        logger.error(
-            f"Failed to fetch {url} after {self.max_retries} attempts: {last_error}"
-        )
+        html = self.fetch_with_retry(url, HEADERS)
+        if html:
+            return BeautifulSoup(html, "html.parser")
         return None
 
     def _parse_card(self, card) -> Dict[str, Any] | None:

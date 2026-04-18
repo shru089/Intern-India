@@ -39,16 +39,23 @@ def apply_for_internship(
     # For now we store the user's MongoDB object-id string hash as an int.
     uid_int = abs(hash(current_user.email)) % (10**9)
 
-    existing = db.query(Application).filter(
-        Application.student_id == uid_int,
-        Application.internship_id == internship_id,
-    ).first()
+    existing = (
+        db.query(Application)
+        .filter(
+            Application.student_id == uid_int,
+            Application.internship_id == internship_id,
+        )
+        .first()
+    )
 
     if existing:
-        raise HTTPException(status_code=400, detail="Already applied to this internship")
+        raise HTTPException(
+            status_code=400, detail="Already applied to this internship"
+        )
 
     application = Application(
         student_id=uid_int,
+        student_email=current_user.email,
         internship_id=internship_id,
         status="applied",
         apply_method=apply_method,
@@ -78,7 +85,9 @@ def get_my_applications(
     total = query.count()
     applications = query.offset((page - 1) * page_size).limit(page_size).all()
 
-    return ApplicationList(items=applications, total=total, page=page, page_size=page_size)
+    return ApplicationList(
+        items=applications, total=total, page=page, page_size=page_size
+    )
 
 
 @router.get("/applications/{app_id}", response_model=ApplicationResponse)
@@ -88,10 +97,14 @@ def get_application(
     current_user: UserInDB = Depends(get_current_user),
 ):
     uid_int = abs(hash(current_user.email)) % (10**9)
-    application = db.query(Application).filter(
-        Application.id == app_id,
-        Application.student_id == uid_int,
-    ).first()
+    application = (
+        db.query(Application)
+        .filter(
+            Application.id == app_id,
+            Application.student_id == uid_int,
+        )
+        .first()
+    )
 
     if not application:
         raise HTTPException(status_code=404, detail="Application not found")

@@ -44,6 +44,7 @@ except ImportError:
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
+
 def _tokenize(csv: str) -> set[str]:
     return {s.strip().lower() for s in (csv or "").split(",") if s.strip()}
 
@@ -69,7 +70,11 @@ def _semantic_score(text_a: str, text_b: str) -> float:
 
 
 def _keyword_skill_score(prof_skills_csv, job_skills_csv) -> float:
-    prof = _tokenize(prof_skills_csv if isinstance(prof_skills_csv, str) else ",".join(prof_skills_csv or []))
+    prof = _tokenize(
+        prof_skills_csv
+        if isinstance(prof_skills_csv, str)
+        else ",".join(prof_skills_csv or [])
+    )
     job = _tokenize(job_skills_csv or "")
     overlap = len(prof & job)
     return overlap / max(len(job), 1)
@@ -107,6 +112,7 @@ def _domain_score(prof_domain_list, job_domain: str) -> float:
 
 
 # ── Public API ────────────────────────────────────────────────────────────────
+
 
 def score_internship(prof: dict | Any, job: Any) -> float:
     """
@@ -151,4 +157,13 @@ def score_internship(prof: dict | Any, job: Any) -> float:
     loc_sc = _location_score(prof_locs, job_location)
 
     total = (0.50 * skill_score) + (0.30 * domain_sc) + (0.20 * loc_sc)
+
+    # Prioritize government internships
+    if job.source == "mygov" or getattr(job, "is_government", False):
+        total += 0.10  # 10% bonus
+
+    # Prioritize rural quota for rural students
+    if getattr(job, "rural_quota", False) and prof.get("is_rural", False):
+        total += 0.15  # 15% bonus
+
     return round(total * 100, 2)

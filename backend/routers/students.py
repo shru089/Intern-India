@@ -23,6 +23,7 @@ router = APIRouter()
 
 # ── Profile ───────────────────────────────────────────────────────────────────
 
+
 @router.post("/profile")
 async def create_or_update_profile(
     body: StudentProfileCreate,
@@ -38,6 +39,7 @@ async def create_or_update_profile(
         "location": body.location,
         "pref_domains": body.pref_domains,
         "pref_locations": body.pref_locations,
+        "is_rural": body.is_rural,
     }
     await db.student_profiles.update_one(
         {"email": current_user.email},
@@ -55,12 +57,15 @@ async def get_profile(
     """Return the authenticated student's profile."""
     prof = await db.student_profiles.find_one({"email": current_user.email})
     if not prof:
-        raise HTTPException(status_code=404, detail="Profile not found — please complete onboarding.")
+        raise HTTPException(
+            status_code=404, detail="Profile not found — please complete onboarding."
+        )
     prof["_id"] = str(prof["_id"])
     return prof
 
 
 # ── Recommendations ───────────────────────────────────────────────────────────
+
 
 @router.get("/recommendations", response_model=RecommendationList)
 async def recommendations(
@@ -108,3 +113,66 @@ async def recommendations(
     return RecommendationList(
         items=paginated_items, total=total, page=page, page_size=page_size
     )
+
+
+# ── Search ─────────────────────────────────────────────────────────────────────
+
+
+@router.get("/search")
+def search_internships(
+    location: str = Query(None),
+    domain: str = Query(None),
+    source: str = Query(None),
+    is_government: bool = Query(None),
+    rural_quota: bool = Query(None),
+    stipend_min: int = Query(None),
+    stipend_max: int = Query(None),
+    db: Session = Depends(get_db),
+):
+    """
+    Search internships with optional filters.
+    Prioritizes government and rural quota internships in results.
+    """
+    query = db.query(Internship)
+
+    if location:
+        query = query.filter(Internship.location.ilike(f"%{location}%"))
+    if domain:
+        query = query.filter(Internship.domain.ilike(f"%{domain}%"))
+    if source:
+        query = query.filter(Internship.source == source)
+    if is_government is not None:
+        query = query.filter(Internship.is_government == is_government)
+    if rural_quota is not None:
+        query = query.filter(Internship.rural_quota == rural_quota)
+    if stipend_min is not None:
+        # Assuming stipend is stored as string like "10000-15000", parse min
+        # For simplicity, filter if stipend contains numbers >= min
+        pass  # TODO: Implement stipend filtering
+    if stipend_max is not None:
+        pass  # TODO: Implement stipend filtering
+
+    # Order by government first, then rural quota
+    query = query.order_by(
+        Internship.is_government.desc(),
+        Internship.rural_quota.desc(),
+        Internship.id.desc(),
+    )
+
+    results = query.all()
+    return [
+        {
+            "id": job.id,
+            "title": job.title,
+            "company_name": job.company_name,
+            "location": job.location,
+            "domain": job.domain,
+            "source": job.source,
+            "source_url": job.source_url,
+            "stipend": job.stipend,
+            "duration_months": job.duration_months,
+            "is_government": job.is_government,
+            "rural_quota": job.rural_quota,
+        }
+        for job in results
+    ]

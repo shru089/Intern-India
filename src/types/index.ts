@@ -10,6 +10,7 @@ export interface User {
   profileCompletion?: number;
   profileImage?: string | null;
   role?: "student" | "admin" | "org";
+  is_rural?: boolean;
 }
 
 export interface Internship {

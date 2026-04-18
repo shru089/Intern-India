@@ -10,6 +10,7 @@ class StudentProfileCreate(BaseModel):
     location: str
     pref_domains: List[str] = []
     pref_locations: List[str] = []
+    is_rural: bool = False
 
 
 class Recommendation(BaseModel):
@@ -33,6 +34,7 @@ class RecommendationList(BaseModel):
 
 
 # === Application Schemas ===
+
 
 class ApplicationCreate(BaseModel):
     internship_id: int
