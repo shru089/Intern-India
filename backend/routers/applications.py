@@ -13,9 +13,9 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
 from ..database import get_db
-from ..models import Application, Internship
-from ..models.user import UserInDB
+from ..models import Application, Internship, UserSQL
 from ..routers.auth import get_current_user
+
 from ..schemas.student import ApplicationCreate, ApplicationResponse, ApplicationList
 
 router = APIRouter(tags=["Applications"])
@@ -26,7 +26,7 @@ def apply_for_internship(
     internship_id: int,
     apply_method: str = "easy_apply",
     db: Session = Depends(get_db),
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserSQL = Depends(get_current_user),
 ):
     """Apply for an internship — tracks the application for the authenticated user."""
     internship = db.query(Internship).filter(Internship.id == internship_id).first()
@@ -74,7 +74,7 @@ def get_my_applications(
     page: int = Query(1, ge=1),
     page_size: int = Query(10, ge=1, le=100),
     db: Session = Depends(get_db),
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserSQL = Depends(get_current_user),
 ):
     """Get all applications for the authenticated user."""
     uid_int = abs(hash(current_user.email)) % (10**9)
@@ -94,7 +94,7 @@ def get_my_applications(
 def get_application(
     app_id: int,
     db: Session = Depends(get_db),
-    current_user: UserInDB = Depends(get_current_user),
+    current_user: UserSQL = Depends(get_current_user),
 ):
     uid_int = abs(hash(current_user.email)) % (10**9)
     application = (

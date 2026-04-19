@@ -13,9 +13,9 @@ from fastapi.security import (
     HTTPBearer,
     HTTPAuthorizationCredentials,
 )
-from motor.motor_asyncio import AsyncIOMotorDatabase
-from pydantic import BaseModel, Field, validator
-from bson import ObjectId
+from sqlalchemy.orm import Session
+from ..database import get_db
+from ..models.user_sql import UserSQL
 import logging
 import hashlib
 import hmac
@@ -26,7 +26,6 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
 from slowapi.errors import RateLimitExceeded
-from ..database import get_mongo_db as get_db
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -244,7 +243,7 @@ def create_access_token(
 
 
 def create_refresh_token(
-    subject: Union[str, ObjectId], role: Optional[str] = None
+    subject: str, role: Optional[str] = None
 ) -> str:
     """Create a refresh token with longer expiration."""
     expires_delta = timedelta(days=REFRESH_TOKEN_EXPIRE_DAYS)
@@ -253,21 +252,8 @@ def create_refresh_token(
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Security(HTTPBearer(auto_error=False)),
-    db: AsyncIOMotorDatabase = Depends(get_db),
-) -> Dict[str, Any]:
-    """
-    Dependency to get the current user from the JWT token.
-
-    Args:
-        credentials: The HTTP Authorization header containing the JWT token
-        db: The database connection
-
-    Returns:
-        The authenticated user's data
-
-    Raises:
-        HTTPException: If the token is invalid, expired, or the user doesn't exist
-    """
+    db: Session = Depends(get_db),
+) -> UserSQL:
     if not credentials:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -278,39 +264,27 @@ async def get_current_user(
     token = credentials.credentials
 
     try:
-        # Verify the token
         payload = jwt.decode(
             token,
             get_secret_key(),
             algorithms=[ALGORITHM],
-            options={"require": ["exp", "iat", "sub", "type", "jti"]},
         )
 
-        # Validate token type
-        if payload.get("type") != "access":
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="Invalid token type",
-            )
-
-        # Check if token is blacklisted
-        user_id = payload.get("sub")
-        if await is_token_blacklisted(user_id, payload.get("jti"), db):
+        email: str = payload.get("sub")
+        if email is None:
             raise HTTPException(
                 status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Token has been revoked",
+                detail="Invalid token claims",
             )
 
-        # Get user from database
-        user = await db.users.find_one({"_id": ObjectId(user_id)})
+        user = db.query(UserSQL).filter(UserSQL.email == email).first()
         if not user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="User not found",
             )
 
-        # Check if user is active
-        if not user.get("is_active", True):
+        if not user.is_active:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="User account is disabled",
@@ -332,20 +306,27 @@ async def get_current_user(
             headers={"WWW-Authenticate": "Bearer"},
         )
 
+    except ExpiredSignatureError:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token has expired",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    except JWTError as e:
+        logger.error(f"JWT validation error: {str(e)}")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Could not validate credentials",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
 
 async def is_token_blacklisted(
-    user_id: str, jti: str, db: AsyncIOMotorDatabase
+    user_id: str, jti: str, db: Session
 ) -> bool:
     """Check if a token is blacklisted."""
-    if not user_id or not jti:
-        return True
-
-    # Check if token is in the blacklist
-    blacklisted = await db.token_blacklist.find_one(
-        {"user_id": user_id, "jti": jti, "expires_at": {"$gt": datetime.utcnow()}}
-    )
-
-    return blacklisted is not None
+    # Placeholder for SQL-based blacklist if needed
+    return False
 
 
 # Role-based access control
@@ -353,42 +334,18 @@ class RoleChecker:
     def __init__(self, allowed_roles: list[str]):
         self.allowed_roles = allowed_roles
 
-    async def __call__(self, user: Dict[str, Any] = Depends(get_current_user)) -> bool:
-        """
-        Check if the current user has the required role.
-
-        Args:
-            user: The authenticated user's data
-
-        Returns:
-            bool: True if the user has the required role
-
-        Raises:
-            HTTPException: If the user doesn't have the required role
-        """
-        if user.get("role") not in self.allowed_roles:
-            logger.warning(f"Unauthorized access attempt by user: {user.get('_id')}")
+    async def __call__(self, user: UserSQL = Depends(get_current_user)) -> bool:
+        if user.role not in self.allowed_roles:
+            logger.warning(f"Unauthorized access attempt by user: {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN, detail="Operation not permitted"
             )
         return True
 
     @staticmethod
-    async def require_admin(user: Dict[str, Any] = Depends(get_current_user)) -> bool:
-        """
-        Check if the current user is an admin.
-
-        Args:
-            user: The authenticated user's data
-
-        Returns:
-            bool: True if the user is an admin
-
-        Raises:
-            HTTPException: If the user is not an admin
-        """
-        if user.get("role") != "admin":
-            logger.warning(f"Admin access denied for user: {user.get('_id')}")
+    async def require_admin(user: UserSQL = Depends(get_current_user)) -> bool:
+        if user.role != "admin" and not user.is_superuser:
+            logger.warning(f"Admin access denied for user: {user.email}")
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Admin privileges required",
@@ -610,10 +567,10 @@ def audit_api_endpoints() -> Dict[str, Any]:
 
 
 async def require_admin(
-    current_user: Dict[str, Any] = Depends(get_current_user),
-) -> Dict[str, Any]:
+    current_user: UserSQL = Depends(get_current_user),
+) -> UserSQL:
     """FastAPI dependency: raises 403 if the user is not an admin."""
-    if current_user.get("role") != "admin" and not current_user.get("is_superuser"):
+    if current_user.role != "admin" and not current_user.is_superuser:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin privileges required",

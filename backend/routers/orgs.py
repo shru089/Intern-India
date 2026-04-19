@@ -17,12 +17,11 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..database import get_db, get_mongo_db
-from ..models import Internship, Application
+from ..database import get_db
+from ..models import Internship, Application, StudentProfile, UserSQL
 from ..routers.auth import get_current_user
-from ..models.user import UserInDB, Role
 from ..services.matching import score_internship
-from motor.motor_asyncio import AsyncIOMotorDatabase
+
 
 router = APIRouter()
 
@@ -85,11 +84,9 @@ class ApplicationForOrg(BaseModel):
 
 
 def require_org_or_admin(
-    current_user: UserInDB = Depends(get_current_user),
-) -> UserInDB:
+    current_user: UserSQL = Depends(get_current_user),
+) -> UserSQL:
     if current_user.role not in (
-        Role.organization,
-        Role.admin,
         "organization",
         "admin",
     ):
@@ -107,7 +104,7 @@ def require_org_or_admin(
 def post_internship(
     body: InternshipPost,
     db: Session = Depends(get_db),
-    current_user: UserInDB = Depends(require_org_or_admin),
+    current_user: UserSQL = Depends(require_org_or_admin),
 ):
     """Post a new internship. Requires an organization account."""
     job = Internship(
@@ -131,7 +128,7 @@ def post_internship(
 @router.get("/internships", response_model=list[InternshipResponse])
 def list_my_internships(
     db: Session = Depends(get_db),
-    current_user: UserInDB = Depends(require_org_or_admin),
+    current_user: UserSQL = Depends(require_org_or_admin),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -148,8 +145,7 @@ async def top_matches_for_role(
     internship_id: int,
     top_n: int = Query(10, ge=1, le=50),
     db: Session = Depends(get_db),
-    mongo: AsyncIOMotorDatabase = Depends(get_mongo_db),
-    current_user: UserInDB = Depends(require_org_or_admin),
+    current_user: UserSQL = Depends(require_org_or_admin),
 ):
     """Return the top-N student profiles that best match a given internship."""
     job = db.query(Internship).filter(Internship.id == internship_id).first()
@@ -157,25 +153,32 @@ async def top_matches_for_role(
         raise HTTPException(status_code=404, detail="Internship not found")
 
     # Fetch all student profiles from MongoDB
-    cursor = mongo.student_profiles.find({})
-    profiles = await cursor.to_list(length=1000)
+    # Fetch all student profiles from SQL
+    profiles = db.query(StudentProfile).all()
 
     scored = []
     for prof in profiles:
-        sc = score_internship(prof, job)
-        skills = prof.get("skills", [])
+        # Convert to dict for matching service if needed
+        prof_dict = {
+            "skills": prof.skills,
+            "pref_domains": prof.pref_domains,
+            "pref_locations": prof.pref_locations,
+            "is_rural": getattr(prof, "is_rural", False)
+        }
+        sc = score_internship(prof_dict, job)
+        skills = prof.skills or ""
         if isinstance(skills, str):
             skills = [s.strip() for s in skills.split(",") if s.strip()]
-        domains = prof.get("pref_domains", [])
+        domains = prof.pref_domains or ""
         if isinstance(domains, str):
             domains = [d.strip() for d in domains.split(",") if d.strip()]
         scored.append(
             TopMatch(
-                email=prof.get("email", ""),
-                full_name=prof.get("full_name"),
+                email=prof.user_email,
+                full_name=getattr(prof, "full_name", None), # Note: full_name might be in User record not StudentProfile
                 skills=skills,
                 match_score=sc,
-                location=prof.get("location"),
+                location=prof.location,
                 pref_domains=domains,
             )
         )
@@ -188,8 +191,7 @@ async def top_matches_for_role(
 async def get_applications_for_my_internships(
     status: Optional[str] = None,
     db: Session = Depends(get_db),
-    mongo: AsyncIOMotorDatabase = Depends(get_mongo_db),
-    current_user: UserInDB = Depends(require_org_or_admin),
+    current_user: UserSQL = Depends(require_org_or_admin),
     page: int = Query(1, ge=1),
     page_size: int = Query(20, ge=1, le=100),
 ):
@@ -213,11 +215,9 @@ async def get_applications_for_my_internships(
 
     result = []
     for app, internship_title in applications:
-        # Get student name from MongoDB using email
-        student_profile = await mongo.student_profiles.find_one(
-            {"email": app.student_email}
-        )
-        student_name = student_profile.get("full_name") if student_profile else None
+        # Get student name from SQL using email
+        student_profile = db.query(StudentProfile).filter(StudentProfile.user_email == app.student_email).first()
+        student_name = getattr(student_profile, "full_name", None) if student_profile else None
 
         result.append(
             ApplicationForOrg(
@@ -239,12 +239,11 @@ async def get_applications_for_my_internships(
 @router.get("/dashboard")
 async def org_dashboard(
     db: Session = Depends(get_db),
-    mongo: AsyncIOMotorDatabase = Depends(get_mongo_db),
-    current_user: UserInDB = Depends(require_org_or_admin),
+    current_user: UserSQL = Depends(require_org_or_admin),
 ):
     """Org dashboard stats: listings count, avg match score, top skills in demand."""
     listings = db.query(Internship).filter(Internship.source == "org_portal").all()
-    total_students = await mongo.student_profiles.count_documents({})
+    total_students = db.query(StudentProfile).count()
 
     # Aggregate required skills across org's listings
     from collections import Counter

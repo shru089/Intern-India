@@ -10,7 +10,7 @@ import logging
 import traceback
 from datetime import datetime
 
-from backend.database import MongoDB, get_db
+from backend.database import get_db
 from backend.routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume, notify
 
 app = FastAPI(
@@ -68,12 +68,6 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_db_client():
-    try:
-        await MongoDB.get_database()
-        logger.info("Connected to MongoDB")
-    except Exception as e:
-        logger.warning(f"MongoDB not connected (optional): {e}")
-
     from backend.database import engine, Base
     import backend.models  # noqa: F401 — registers all models with Base
 
@@ -81,10 +75,6 @@ async def startup_db_client():
     logger.info("SQLAlchemy tables created/verified.")
 
 
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    await MongoDB.close_connection()
-    logger.info("Closed MongoDB connection")
 
 
 # ── Security headers ──────────────────────────────────────────────────────────
@@ -131,17 +121,12 @@ class HealthCheckResponse(BaseModel):
 async def health():
     db_status = "disconnected"
     try:
-        db = await MongoDB.get_database()
-        await db.command("ping")
-        db_status = "mongodb_connected"
-    except Exception:
-        try:
-            from backend.database import engine
-            with engine.connect() as conn:
-                conn.execute(text("SELECT 1"))
-            db_status = "sqlite_connected"
-        except Exception as sql_e:
-            logger.error(f"Health check — SQLite also failed: {sql_e}")
+        from backend.database import engine
+        with engine.connect() as conn:
+            conn.execute(text("SELECT 1"))
+        db_status = "sqlite_connected"
+    except Exception as sql_e:
+        logger.error(f"Health check — SQL failed: {sql_e}")
 
     return {
         "status": "ok",

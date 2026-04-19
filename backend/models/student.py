@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Float
+from sqlalchemy import Column, Integer, String, Float, Boolean
 from ..database import Base
 
 
@@ -16,3 +16,5 @@ class StudentProfile(Base):
     location   = Column(String)
     pref_domains   = Column(String)
     pref_locations = Column(String)
+    is_rural       = Column(Boolean, default=False)
+
