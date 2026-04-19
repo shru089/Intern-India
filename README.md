@@ -55,7 +55,7 @@ npm install
 cp .env.example .env.local
 # Edit .env.local and set VITE_API_URL if your backend runs on a different port
 
-# Start dev server (port 5173)
+# Start dev server (port 5175)
 npm run dev
 ```
 

@@ -25,7 +25,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # ── CORS ──────────────────────────────────────────────────────────────────────
-_allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5173").split(",")
+_allowed_origins = os.getenv("ALLOWED_ORIGINS", "http://localhost:5175").split(",")
 
 app.add_middleware(
     CORSMiddleware,

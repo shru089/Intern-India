@@ -40,4 +40,8 @@ window.addEventListener('message', async (message) => {
       "@": path.resolve(__dirname, "./src"),
     },
   },
+  server: {
+    port: 5175,
+    strictPort: true,
+  },
 }));
