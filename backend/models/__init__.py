@@ -1,4 +1,5 @@
 from .user import User
+from .user_sql import UserSQL
 from .student import StudentProfile
 from .organization import Organization
 from .internship import Internship
