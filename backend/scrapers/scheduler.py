@@ -14,8 +14,8 @@ from datetime import datetime
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
-from ..database import SessionLocal
-from ..utils.notifications import broadcast_alert
+from database import SessionLocal
+from utils.notifications import broadcast_alert
 from .internshala import InternshalaScraper
 from .aicte import AICTEScraper
 from .engine import ScraperEngine

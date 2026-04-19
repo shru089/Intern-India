@@ -53,7 +53,7 @@ def main():
             print(f"    Source   : {r['source']}")
             print(f"    URL      : {r['source_url']}")
     else:
-        from ..database import SessionLocal
+        from database import SessionLocal
         from .engine import ScraperEngine
         db = SessionLocal()
         try:

@@ -9,11 +9,11 @@ import logging
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from motor.motor_asyncio import AsyncIOMotorDatabase
 
-from ..services.resume_parser import ResumeParser
-from ..database import get_mongo_db
-from ..routers.auth import get_current_user
-from ..models.user import UserInDB
-from ..utils.security import encrypt_sensitive_data, security_auditor
+from services.resume_parser import ResumeParser
+from mongo import get_mongo_db
+from routers.auth import get_current_user
+from models.user import UserInDB
+from utils.security import encrypt_sensitive_data, security_auditor
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/resume", tags=["Resume Parser"])

@@ -10,8 +10,8 @@ import logging
 import traceback
 from datetime import datetime
 
-from backend.database import get_db
-from backend.routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume, notify
+from database import get_db
+from routers import auth, students, orgs, admin, ai_engine, scraper, applications, resume, notify
 
 app = FastAPI(
     title="Intern-India API",
@@ -68,8 +68,8 @@ async def http_exception_handler(request: Request, exc: HTTPException):
 # ── Lifecycle ─────────────────────────────────────────────────────────────────
 @app.on_event("startup")
 async def startup_db_client():
-    from backend.database import engine, Base
-    import backend.models  # noqa: F401 — registers all models with Base
+    from database import engine, Base
+    import models  # noqa: F401 — registers all models with Base
 
     Base.metadata.create_all(bind=engine)
     logger.info("SQLAlchemy tables created/verified.")
@@ -121,7 +121,7 @@ class HealthCheckResponse(BaseModel):
 async def health():
     db_status = "disconnected"
     try:
-        from backend.database import engine
+        from database import engine
         with engine.connect() as conn:
             conn.execute(text("SELECT 1"))
         db_status = "sqlite_connected"

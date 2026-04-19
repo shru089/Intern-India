@@ -17,10 +17,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from ..database import get_db
-from ..models import Internship, Application, StudentProfile, UserSQL
-from ..routers.auth import get_current_user
-from ..services.matching import score_internship
+from database import get_db
+from models import Internship, Application, StudentProfile, UserSQL
+from routers.auth import get_current_user
+from services.matching import score_internship
 
 
 router = APIRouter()

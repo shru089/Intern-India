@@ -1,6 +1,6 @@
 from __future__ import annotations
 from .allocation import score_match, tokenize
-from ..mongo import db
+from mongo import db
 
 
 async def allocate_for_student_mongo(user_id: int, persist: bool = True) -> list[dict]:

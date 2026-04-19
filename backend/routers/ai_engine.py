@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..services.chatbot import query_gemini
-from ..services.allocation import allocate_for_student, run_global_allocation
-from ..services.career_insights import summarize_local, enrich_with_gemini
-from ..utils.security import require_admin
+from database import get_db
+from services.chatbot import query_gemini
+from services.allocation import allocate_for_student, run_global_allocation
+from services.career_insights import summarize_local, enrich_with_gemini
+from utils.security import require_admin
 
 router = APIRouter()
 

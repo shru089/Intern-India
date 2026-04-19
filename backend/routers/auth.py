@@ -21,9 +21,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from jose import JWTError, jwt
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models.user_sql import UserSQL
-from ..models.user import UserCreate
+from database import get_db
+from models.user_sql import UserSQL
+from models.user import UserCreate
 
 
 load_dotenv()

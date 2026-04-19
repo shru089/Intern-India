@@ -14,9 +14,9 @@ import os
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
-from ..utils.notifications import send_whatsapp_alert_sync, send_telegram_alert, broadcast_alert
-from ..routers.auth import get_current_user
-from ..models.user import UserInDB
+from utils.notifications import send_whatsapp_alert_sync, send_telegram_alert, broadcast_alert
+from routers.auth import get_current_user
+from models.user import UserInDB
 
 router = APIRouter()
 

@@ -1,5 +1,5 @@
 from sqlalchemy import Column, Integer, String, ForeignKey, Boolean, Index
-from ..database import Base
+from database import Base
 
 
 class Internship(Base):

@@ -11,10 +11,10 @@ from fastapi import APIRouter, BackgroundTasks, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import text
 
-from ..database import get_db, SessionLocal
-from ..scrapers.internshala import InternshalaScraper
-from ..scrapers.aicte import AICTEScraper
-from ..scrapers.engine import ScraperEngine
+from database import get_db, SessionLocal
+from scrapers.internshala import InternshalaScraper
+from scrapers.aicte import AICTEScraper
+from scrapers.engine import ScraperEngine
 
 logger = logging.getLogger(__name__)
 router = APIRouter()

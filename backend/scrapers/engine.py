@@ -2,7 +2,7 @@ import asyncio
 import logging
 from typing import List
 from sqlalchemy.orm import Session
-from ..models import Internship
+from models import Internship
 from .base import BaseScraper
 
 logger = logging.getLogger(__name__)

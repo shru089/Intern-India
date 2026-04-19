@@ -41,7 +41,7 @@ const DashboardPage = () => {
         <div className="flex justify-between items-center mb-8">
           <div>
             <h2 className="text-3xl font-bold text-white">Dashboard</h2>
-            <p className="text-neutral-400">Welcome back, {user.fullName.split(' ')[0]}!</p>
+            <p className="text-neutral-400">Welcome back, {(user.fullName || user.email || 'User').split(' ')[0]}!</p>
           </div>
           <div className="flex items-center gap-4">
              <button className="glass-card p-3 rounded-full hover:text-primary"><Bell size={20}/></button>

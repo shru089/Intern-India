@@ -1,6 +1,6 @@
 from __future__ import annotations
 from sqlalchemy.orm import Session
-from ..models import StudentProfile, Internship, Allocation
+from models import StudentProfile, Internship, Allocation
 import numpy as np
 from scipy.optimize import linear_sum_assignment
 

@@ -4,9 +4,11 @@ import time
 import base64
 from datetime import datetime, timedelta, timezone
 from typing import Optional, Dict, Any, List, Tuple, Union
+from bson import ObjectId
 from jose import JWTError, jwt
 from jose.exceptions import ExpiredSignatureError, JWTClaimsError
 from passlib.context import CryptContext
+from pydantic import BaseModel
 from fastapi import Depends, HTTPException, status, Request, Security
 from fastapi.security import (
     OAuth2PasswordBearer,
@@ -14,8 +16,8 @@ from fastapi.security import (
     HTTPAuthorizationCredentials,
 )
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models.user_sql import UserSQL
+from database import get_db
+from models.user_sql import UserSQL
 import logging
 import hashlib
 import hmac
@@ -528,7 +530,7 @@ security_auditor = SecurityAuditor()
 # Security audit endpoint for admins
 def audit_api_endpoints() -> Dict[str, Any]:
     """Audit API endpoints for common security issues."""
-    from ..main import app
+    from main import app
 
     issues = []
 

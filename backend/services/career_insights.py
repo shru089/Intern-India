@@ -1,6 +1,6 @@
 from __future__ import annotations
 from sqlalchemy.orm import Session
-from ..models import StudentProfile, Internship, Application
+from models import StudentProfile, Internship, Application
 import os
 import httpx
 

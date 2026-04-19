@@ -9,12 +9,12 @@ GET  /students/recommendations — Get AI-ranked internship recommendations
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
-from ..database import get_db
-from ..models import Internship, StudentProfile, UserSQL
-from ..schemas.student import StudentProfileCreate, RecommendationList, Recommendation
-from ..routers.auth import get_current_user
+from database import get_db
+from models import Internship, StudentProfile, UserSQL
+from schemas.student import StudentProfileCreate, RecommendationList, Recommendation
+from routers.auth import get_current_user
 
-from ..services.matching import score_internship
+from services.matching import score_internship
 
 router = APIRouter()
 
