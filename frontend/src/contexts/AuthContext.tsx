@@ -56,7 +56,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const { email, password, fullName, role } = userData;
     const { data } = await apiClient.post<{ access_token: string; token_type: string }>(
       "/auth/register",
-      { email, password, name: fullName, role }
+      { email, password, full_name: fullName, role }
     );
     const newToken = data.access_token;
     setToken(newToken);

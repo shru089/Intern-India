@@ -56,7 +56,7 @@ const AuthPage = () => {
           throw new Error('Passwords do not match.');
         }
         await toast.promise(
-          register({ name: formData.fullName, email: formData.email, password: formData.password, role: 'student' }),
+          register({ fullName: formData.fullName, email: formData.email, password: formData.password, role: 'student' }),
           {
             loading: 'Creating account...',
             success: <b>Registration successful!</b>,

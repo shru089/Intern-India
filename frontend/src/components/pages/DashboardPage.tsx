@@ -1,13 +1,17 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { Search, ListChecks, Bell, Settings } from 'lucide-react';
+import { Search, ListChecks, Bell, Settings, Sparkles, TrendingUp, Award } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import PageWrapper from '../layout/PageWrapper';
 import ProfileCompletion from '../common/ProfileCompletion';
 import MagicText from '../common/MagicText';
 
-const BentoCard = ({ children, className = '', ...props }) => (
+interface BentoCardProps extends React.HTMLAttributes<HTMLDivElement> {
+  children: React.ReactNode;
+}
+
+const BentoCard = ({ children, className = '', ...props }: BentoCardProps) => (
   <motion.div
     variants={{
       hidden: { opacity: 0, y: 20 },
@@ -17,7 +21,7 @@ const BentoCard = ({ children, className = '', ...props }) => (
       scale: 1.02,
       boxShadow: '0 0 40px -10px rgba(6, 182, 212, 0.5)',
     }}
-    className={`glass-card p-6 relative overflow-hidden ${className}`}
+    className={`glass-card p-6 relative overflow-hidden transition-all duration-300 ${className}`}
     {...props}
   >
     {children}
@@ -27,6 +31,20 @@ const BentoCard = ({ children, className = '', ...props }) => (
 const DashboardPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const [insights, setInsights] = React.useState<{ summary: string; recommendations: string[] } | null>(null);
+  const [loadingInsights, setLoadingInsights] = React.useState(false);
+
+  React.useEffect(() => {
+    if (user?.id) {
+      const fetchInsights = async () => {
+        setLoadingInsights(true);
+        const data = await api.getCareerInsights(user.id!);
+        setInsights(data);
+        setLoadingInsights(false);
+      };
+      fetchInsights();
+    }
+  }, [user]);
 
   if (!user) return null;
 
@@ -55,7 +73,7 @@ const DashboardPage = () => {
           animate="visible"
           className="grid grid-cols-1 lg:grid-cols-3 xl:grid-cols-4 grid-rows-3 gap-6"
         >
-          <BentoCard className="lg:col-span-2 xl:col-span-3 row-span-1" onClick={() => navigate('/find-internships')}>
+          <BentoCard className="lg:col-span-2 xl:col-span-2 row-span-1" onClick={() => navigate('/find-internships')}>
             <div className="flex flex-col justify-between h-full cursor-pointer">
               <div>
                 <Search className="text-primary mb-2" size={28} />
@@ -66,35 +84,78 @@ const DashboardPage = () => {
             </div>
           </BentoCard>
 
+          <BentoCard className="lg:col-span-1 xl:col-span-1 row-span-2">
+             <div className="h-full flex flex-col">
+                <div className="flex items-center gap-2 mb-4">
+                    <Sparkles className="text-yellow-400" size={24} />
+                    <h3 className="text-xl font-bold text-white">AI Career Scout</h3>
+                </div>
+                {loadingInsights ? (
+                    <div className="flex-1 flex items-center justify-center">
+                        <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
+                    </div>
+                ) : (
+                    <div className="space-y-4">
+                        <p className="text-sm text-neutral-300 leading-relaxed italic">
+                            "{insights?.summary || 'Scanning current trends to provide your personalized career map...'}"
+                        </p>
+                        {insights?.recommendations && (
+                            <div className="space-y-2">
+                                {insights.recommendations.map((rec, i) => (
+                                    <div key={i} className="flex items-center gap-2 text-xs text-neutral-400">
+                                        <TrendingUp size={12} className="text-primary" />
+                                        <span>{rec}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+             </div>
+          </BentoCard>
+
           <BentoCard className="row-span-2">
-             <ProfileCompletion completion={user.profileCompletion} />
+             <ProfileCompletion completion={user.profileCompletion || 0} />
           </BentoCard>
 
           <BentoCard className="lg:col-span-1 xl:col-span-2 row-span-2" onClick={() => navigate('/applied-internships')}>
              <div className="cursor-pointer h-full flex flex-col">
-                <ListChecks className="text-secondary mb-2" size={28} />
+                <div className="flex justify-between items-start mb-2">
+                    <ListChecks className="text-secondary" size={28} />
+                    <span className="bg-secondary/20 text-secondary text-[10px] px-2 py-0.5 rounded-full font-bold">2 ACTIVE</span>
+                </div>
                 <h3 className="text-xl font-bold text-white">Track Applications</h3>
-                <p className="text-neutral-400 mt-1">See the status of all your applications on an interactive board.</p>
-                <div className="mt-auto pt-4">
-                    {/* Mock Data */}
-                    <div className="text-sm space-y-2">
-                        <p className="font-semibold">Recent Activity:</p>
-                        <p>• AI/ML Intern <span className="text-yellow-400">Under Review</span></p>
-                        <p>• Data Analyst Intern <span className="text-green-400">Shortlisted</span></p>
+                <p className="text-neutral-400 mt-1">Status updates, interview calls and more.</p>
+                <div className="mt-auto pt-6">
+                    <div className="space-y-3">
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-neutral-300">Google Summer of Code</span>
+                           <span className="text-yellow-400 font-bold uppercase tracking-widest text-[8px]">In Review</span>
+                        </div>
+                        <div className="flex justify-between items-center text-xs">
+                           <span className="text-neutral-300">Indian Railways IT</span>
+                           <span className="text-green-400 font-bold uppercase tracking-widest text-[8px]">Shortlisted</span>
+                        </div>
                     </div>
                 </div>
             </div>
           </BentoCard>
           
           <BentoCard>
-             <h3 className="font-bold text-white">Profile Views</h3>
-             <p className="text-5xl font-extrabold text-primary mt-2">12</p>
-             <p className="text-xs text-neutral-400">+2 this week</p>
+             <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg"><Award className="text-primary" size={20}/></div>
+                <h3 className="font-bold text-white">Achievements</h3>
+             </div>
+             <p className="text-4xl font-extrabold text-white mt-3">3</p>
+             <p className="text-xs text-neutral-400 mt-1">Badges earned</p>
           </BentoCard>
 
-           <BentoCard>
-             <h3 className="font-bold text-white">Tip of the Day</h3>
-             <p className="text-sm text-neutral-300 mt-2">Tailor your resume for each application to highlight relevant skills.</p>
+           <BentoCard className="xl:col-span-1">
+             <h3 className="font-bold text-white flex items-center gap-2">
+                <TrendingUp size={18} className="text-green-400"/>
+                Market Pulse
+             </h3>
+             <p className="text-sm text-neutral-300 mt-2">Demand for <span className="text-primary">React + FastAPI</span> developers is up 12% this month.</p>
           </BentoCard>
 
         </motion.div>

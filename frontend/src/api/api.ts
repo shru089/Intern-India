@@ -91,4 +91,28 @@ export const api = {
       throw error;
     }
   },
+
+  // ── AI Engine ──────────────────────────────────────────────────────────────
+  getCareerInsights: async (userId: number): Promise<any> => {
+    try {
+      const { data } = await apiClient.get(`/ai-engine/insights?user_id=${userId}`);
+      return data;
+    } catch (error) {
+      console.error("API Error - getCareerInsights:", error);
+      return {
+        summary: "Keep building your profile to unlock personalized AI career insights.",
+        recommendations: ["Complete your skills section", "Upload a fresh resume"],
+      };
+    }
+  },
+
+  sendMessageToChatbot: async (message: string): Promise<string> => {
+    try {
+      const { data } = await apiClient.post("/ai-engine/chatbot/query", { message });
+      return data.answer;
+    } catch (error) {
+      console.error("API Error - sendMessageToChatbot:", error);
+      return "I'm having trouble connecting to the AI brain right now. Please try again later.";
+    }
+  },
 };
