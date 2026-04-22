@@ -3,19 +3,19 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 
 // Layouts
-import Navbar from './components/layout/Navbar';
-import Footer from './components/layout/Footer';
+import Navbar from './components/layout/Navbar.tsx';
+import Footer from './components/layout/Footer.tsx';
 
 // Context
-import { AuthProvider } from './contexts/AuthContext';
+import { AuthProvider } from './contexts/AuthContext.tsx';
 
 // Pages
-const LandingPage = lazy(() => import('./pages/LandingPage'));
-const AuthPage = lazy(() => import('./pages/AuthPage'));
-const DashboardPage = lazy(() => import('./pages/DashboardPage'));
-const InternshipFinder = lazy(() => import('./pages/InternshipFinder'));
-const ProfilePage = lazy(() => import('./pages/ProfilePage'));
-const AIScout = lazy(() => import('./pages/AIScout'));
+const LandingPage = lazy(() => import('./pages/LandingPage.tsx'));
+const AuthPage = lazy(() => import('./pages/AuthPage.tsx'));
+const DashboardPage = lazy(() => import('./pages/DashboardPage.tsx'));
+const InternshipFinder = lazy(() => import('./pages/InternshipFinder.tsx'));
+const ProfilePage = lazy(() => import('./pages/ProfilePage.tsx'));
+const AIScout = lazy(() => import('./pages/AIScout.tsx'));
 
 // Auth Guard (Simplified for now)
 const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
@@ -68,20 +68,8 @@ const App: React.FC = () => {
 };
 
 const LoadingSpinner = () => (
-  <div className="flex-center" style={{ height: '80vh' }}>
+  <div className="flex-center spinner-container">
     <div className="loader"></div>
-    <style>{`
-      .loader {
-        width: 50px;
-        height: 50px;
-        border: 3px solid var(--glass-border);
-        border-top-color: var(--primary-neon);
-        border-radius: 50%;
-        animation: spin 1s linear infinite;
-        box-shadow: 0 0 15px var(--primary-neon);
-      }
-      @keyframes spin { to { transform: rotate(360deg); } }
-    `}</style>
   </div>
 );
 
