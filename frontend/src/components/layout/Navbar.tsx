@@ -44,7 +44,7 @@ const Navbar: React.FC = () => {
               <Link to="/profile" className={location.pathname === '/profile' ? 'active' : ''}>
                 <User size={18} /> PROFILE
               </Link>
-              <button onClick={handleLogout} className="logout-btn">
+              <button onClick={handleLogout} className="logout-btn" aria-label="Logout">
                 <LogOut size={18} />
               </button>
             </>

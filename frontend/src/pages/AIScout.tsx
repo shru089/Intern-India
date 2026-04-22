@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Send, Sparkles, TrendingUp, Cpu, Globe, MessageSquare } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const AIScout: React.FC = () => {
   const [query, setQuery] = useState('');
@@ -33,24 +34,38 @@ const AIScout: React.FC = () => {
       <div className="scout-grid">
         {/* Left: Intelligence Panels */}
         <div className="scout-panels">
-          <div className="glass-card panel reveal" style={{ animationDelay: '0.1s' }}>
+          <div className="glass-card panel reveal reveal-d1">
             <div className="panel-header">
               <TrendingUp className="neon-text-cyan" size={18} />
               <h4 className="font-orbitron">MARKET PULSE</h4>
             </div>
             <div className="pulse-item">
               <span className="label">Web3 Devs</span>
-              <div className="pulse-bar"><div className="fill" style={{width: '80%'}}></div></div>
+              <div className="pulse-bar">
+                <motion.div 
+                  className="fill" 
+                  initial={{ width: 0 }}
+                  animate={{ width: '80%' }}
+                  transition={{ duration: 1.5, delay: 0.2 }}
+                ></motion.div>
+              </div>
               <span className="trend up">+12%</span>
             </div>
             <div className="pulse-item">
               <span className="label">Cybersec</span>
-              <div className="pulse-bar"><div className="fill" style={{width: '65%'}}></div></div>
+              <div className="pulse-bar">
+                <motion.div 
+                  className="fill" 
+                  initial={{ width: 0 }}
+                  animate={{ width: '65%' }}
+                  transition={{ duration: 1.5, delay: 0.4 }}
+                ></motion.div>
+              </div>
               <span className="trend up">+8%</span>
             </div>
           </div>
 
-          <div className="glass-card panel reveal" style={{ animationDelay: '0.2s' }}>
+          <div className="glass-card panel reveal reveal-d2">
             <div className="panel-header">
               <Globe className="neon-text-pink" size={18} />
               <h4 className="font-orbitron">GLOBAL RADAR</h4>
@@ -60,7 +75,7 @@ const AIScout: React.FC = () => {
         </div>
 
         {/* Right: AI Chat Interface */}
-        <div className="glass-card chat-interface reveal" style={{ animationDelay: '0.3s' }}>
+        <div className="glass-card chat-interface reveal reveal-d3">
           <div className="chat-messages">
             {chat.map((msg, i) => (
               <div key={i} className={`message-wrapper ${msg.role}`}>
@@ -79,90 +94,13 @@ const AIScout: React.FC = () => {
               value={query}
               onChange={e => setQuery(e.target.value)}
             />
-            <button type="submit" className="btn btn-primary btn-icon">
+            <button type="submit" className="btn btn-primary btn-icon" aria-label="Send query">
               <Send size={18} />
             </button>
           </form>
         </div>
       </div>
 
-      <style>{`
-        .scout-container { padding-top: 8rem; }
-        .scout-header { margin-bottom: 3rem; text-align: center; }
-        .scout-header h1 { font-size: 2.5rem; display: flex; align-items: center; justify-content: center; gap: 1rem; }
-        .scout-header p { color: var(--text-dim); }
-
-        .scout-grid { display: grid; grid-template-columns: 350px 1fr; gap: 2rem; height: 600px; }
-        .scout-panels { display: flex; flex-direction: column; gap: 1.5rem; }
-        .panel { padding: 1.5rem; }
-        .panel-header { display: flex; align-items: center; gap: 0.8rem; margin-bottom: 1.5rem; border-bottom: 1px solid var(--glass-border); padding-bottom: 0.8rem; }
-        .panel-header h4 { font-size: 0.75rem; margin: 0; }
-        
-        .pulse-item { display: flex; align-items: center; gap: 1rem; margin-bottom: 1rem; }
-        .pulse-item .label { font-size: 0.75rem; width: 80px; }
-        .pulse-bar { flex: 1; height: 6px; background: rgba(255,255,255,0.05); border-radius: 3px; overflow: hidden; }
-        .pulse-bar .fill { height: 100%; background: var(--primary-neon); box-shadow: 0 0 10px var(--primary-neon); }
-        .trend { font-size: 0.7rem; font-weight: 800; }
-        .trend.up { color: var(--accent-neon); }
-        .panel-text { font-size: 0.85rem; color: var(--text-dim); line-height: 1.5; }
-
-        .chat-interface { 
-          display: flex; 
-          flex-direction: column; 
-          overflow: hidden; 
-          border-color: rgba(0, 245, 255, 0.1); 
-        }
-        .chat-messages { flex: 1; padding: 2rem; overflow-y: auto; display: flex; flex-direction: column; gap: 1.5rem; }
-        .message-wrapper { display: flex; width: 100%; }
-        .message-wrapper.user { justify-content: flex-end; }
-        .message-bubble { 
-          max-width: 80%; 
-          padding: 1rem 1.5rem; 
-          border-radius: 12px; 
-          font-size: 0.9rem; 
-          line-height: 1.6;
-          position: relative;
-        }
-        .ai .message-bubble { 
-          background: rgba(255,255,255,0.03); 
-          border: 1px solid var(--glass-border);
-          color: #fff;
-          border-left: 3px solid var(--primary-neon);
-        }
-        .user .message-bubble { 
-          background: var(--primary-neon); 
-          color: #000; 
-          font-weight: 600;
-          box-shadow: 4px 4px 0 #000;
-        }
-        .ai-icon { position: absolute; left: -25px; top: 15px; color: var(--primary-neon); }
-
-        .chat-input-area { 
-          padding: 1.5rem; 
-          background: rgba(0,0,0,0.3); 
-          border-top: 1px solid var(--glass-border); 
-          display: flex; 
-          gap: 1rem; 
-        }
-        .chat-input-area input { 
-          flex: 1; 
-          background: rgba(255,255,255,0.05); 
-          border: 1px solid var(--glass-border); 
-          padding: 1rem 1.5rem; 
-          border-radius: 8px; 
-          color: #fff; 
-          font-family: 'Orbitron', sans-serif;
-          font-size: 0.8rem;
-          outline: none;
-        }
-        .chat-input-area input:focus { border-color: var(--primary-neon); }
-        .btn-icon { width: 50px; height: 50px; display: flex; align-items: center; justify-content: center; padding: 0; }
-
-        @media (max-width: 1024px) {
-          .scout-grid { grid-template-columns: 1fr; height: auto; }
-          .chat-interface { height: 500px; }
-        }
-      `}</style>
     </div>
   );
 };

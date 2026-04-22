@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Filter, MapPin, Briefcase, ExternalLink, ShieldCheck } from 'lucide-react';
+import { motion } from 'framer-motion';
 
 const InternshipFinder: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -20,6 +21,7 @@ const InternshipFinder: React.FC = () => {
           <input 
             type="text" 
             placeholder="SEARCH BY SKILL, ROLE OR ORGANIZATION..." 
+            aria-label="Search internships"
             value={searchTerm}
             onChange={e => setSearchTerm(e.target.value)}
           />
@@ -28,7 +30,7 @@ const InternshipFinder: React.FC = () => {
       </div>
 
       <div className="finder-layout">
-        <aside className="filters glass-card reveal" style={{ animationDelay: '0.2s' }}>
+        <aside className="filters glass-card reveal reveal-d2">
           <div className="filter-group">
             <h4 className="font-orbitron"><Filter size={16} /> FILTERS</h4>
           </div>
@@ -41,8 +43,8 @@ const InternshipFinder: React.FC = () => {
             </div>
           </div>
           <div className="filter-group">
-            <label>STIPEND RANGE</label>
-            <input type="range" className="neon-range" />
+            <label htmlFor="stipend-range">STIPEND RANGE</label>
+            <input type="range" id="stipend-range" className="neon-range" aria-label="Stipend range selector" />
           </div>
           <div className="filter-group">
             <label>QUOTA</label>
@@ -55,7 +57,13 @@ const InternshipFinder: React.FC = () => {
 
         <main className="results-list">
           {internships.map((job, i) => (
-            <div key={job.id} className="glass-card job-card reveal" style={{ animationDelay: `${0.3 + i*0.1}s` }}>
+            <motion.div 
+              key={job.id} 
+              className="glass-card job-card"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 + i * 0.1 }}
+            >
               <div className="job-header">
                 <div className="job-meta">
                   <div className="job-type-badge"><ShieldCheck size={12}/> {job.type}</div>
@@ -66,7 +74,12 @@ const InternshipFinder: React.FC = () => {
                   <span className="score-val">{job.score}%</span>
                   <span className="score-label">MATCH</span>
                   <div className="score-bar-bg">
-                    <div className="score-bar-fill" style={{ width: `${job.score}%` }}></div>
+                    <motion.div 
+                      className="score-bar-fill" 
+                      initial={{ width: 0 }}
+                      animate={{ width: `${job.score}%` }}
+                      transition={{ duration: 1, delay: 0.5 + i * 0.1 }}
+                    ></motion.div>
                   </div>
                 </div>
               </div>
@@ -81,91 +94,11 @@ const InternshipFinder: React.FC = () => {
                 <button className="btn btn-outline">DETAILS</button>
                 <button className="btn btn-primary">APPLY NOW <ExternalLink size={16} /></button>
               </div>
-            </div>
+            </motion.div>
           ))}
         </main>
       </div>
 
-      <style>{`
-        .finder { padding-top: 8rem; }
-        .finder-header { margin-bottom: 4rem; text-align: center; }
-        .finder-header h1 { font-size: 3rem; margin-bottom: 2rem; }
-        .search-bar {
-          display: flex;
-          align-items: center;
-          padding: 0.5rem 0.5rem 0.5rem 1.5rem;
-          max-width: 800px;
-          margin: 0 auto;
-          border-radius: 50px;
-        }
-        .search-icon { color: var(--text-dim); }
-        .search-bar input {
-          flex: 1;
-          background: none;
-          border: none;
-          padding: 0.8rem 1rem;
-          color: #fff;
-          font-family: 'Orbitron', sans-serif;
-          font-size: 0.8rem;
-          outline: none;
-        }
-        .finder-layout {
-          display: grid;
-          grid-template-columns: 280px 1fr;
-          gap: 2rem;
-          align-items: start;
-        }
-        .filters { padding: 2rem; position: sticky; top: 6rem; }
-        .filter-group { margin-bottom: 2rem; }
-        .filter-group h4 { font-size: 0.8rem; margin-bottom: 1.5rem; color: var(--primary-neon); display: flex; align-items: center; gap: 0.5rem; }
-        .filter-group label { display: block; font-size: 0.7rem; color: var(--text-dim); margin-bottom: 1rem; font-weight: 700; }
-        .checkbox-group { display: flex; flex-direction: column; gap: 0.8rem; }
-        .checkbox-group label { display: flex; align-items: center; gap: 0.8rem; font-size: 0.8rem; color: #fff; margin: 0; cursor: pointer; }
-        .checkbox-group input { accent-color: var(--primary-neon); }
-
-        .results-list { display: flex; flex-direction: column; gap: 1.5rem; }
-        .job-card { padding: 2rem; transition: transform 0.3s ease; }
-        .job-card:hover { transform: scale(1.01); border-color: rgba(0, 245, 255, 0.3); }
-        .job-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 1.5rem; }
-        .job-type-badge {
-          display: inline-flex;
-          align-items: center;
-          gap: 0.4rem;
-          font-size: 0.6rem;
-          font-weight: 800;
-          color: var(--accent-neon);
-          background: rgba(57, 255, 20, 0.05);
-          padding: 0.3rem 0.6rem;
-          border-radius: 4px;
-          margin-bottom: 0.8rem;
-          font-family: 'Orbitron', sans-serif;
-        }
-        .job-title { font-size: 1.5rem; font-weight: 800; margin-bottom: 0.2rem; }
-        .job-company { color: var(--primary-neon); font-family: 'Orbitron', sans-serif; font-size: 0.8rem; font-weight: 700; }
-        
-        .match-score { text-align: right; width: 120px; }
-        .score-val { display: block; font-size: 1.8rem; font-weight: 900; line-height: 1; color: var(--primary-neon); }
-        .score-label { font-size: 0.6rem; font-weight: 800; color: var(--text-dim); }
-        .score-bar-bg { height: 4px; background: rgba(255,255,255,0.1); border-radius: 2px; margin-top: 0.5rem; overflow: hidden; }
-        .score-bar-fill { height: 100%; background: var(--primary-neon); box-shadow: 0 0 10px var(--primary-neon); }
-
-        .job-details { display: flex; gap: 2rem; margin-bottom: 2rem; }
-        .detail-item { display: flex; align-items: center; gap: 0.5rem; color: var(--text-dim); font-size: 0.85rem; }
-        .stipend { color: #fff; font-weight: 700; }
-
-        .job-actions { display: flex; gap: 1rem; }
-
-        @media (max-width: 1024px) {
-          .finder-layout { grid-template-columns: 1fr; }
-          .filters { position: static; }
-        }
-        @media (max-width: 768px) {
-          .job-header { flex-direction: column; gap: 1.5rem; }
-          .match-score { text-align: left; width: 100%; }
-          .job-details { flex-direction: column; gap: 0.8rem; }
-          .job-actions { flex-direction: column; }
-        }
-      `}</style>
     </div>
   );
 };

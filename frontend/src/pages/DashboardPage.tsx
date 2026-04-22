@@ -33,7 +33,7 @@ const DashboardPage: React.FC = () => {
     }, 1000);
   }, []);
 
-  if (loading) return <div className="flex-center" style={{height: '80vh'}}><div className="loader"></div></div>;
+  if (loading) return <div className="flex-center spinner-container"><div className="loader"></div></div>;
 
   return (
     <div className="dashboard container">
@@ -53,7 +53,7 @@ const DashboardPage: React.FC = () => {
 
       <div className="bento-grid">
         {/* Stats Row */}
-        <div className="glass-card bento-item stat reveal" style={{ animationDelay: '0.1s' }}>
+        <div className="glass-card bento-item stat reveal reveal-d1">
           <Briefcase className="neon-text-cyan" />
           <div className="stat-content">
             <span className="label">ACTIVE APPS</span>
@@ -61,7 +61,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
         
-        <div className="glass-card bento-item stat reveal" style={{ animationDelay: '0.2s' }}>
+        <div className="glass-card bento-item stat reveal reveal-d2">
           <TrendingUp className="neon-text-pink" />
           <div className="stat-content">
             <span className="label">TOP MATCHES</span>
@@ -69,7 +69,7 @@ const DashboardPage: React.FC = () => {
           </div>
         </div>
 
-        <div className="glass-card bento-item stat reveal" style={{ animationDelay: '0.3s' }}>
+        <div className="glass-card bento-item stat reveal reveal-d3">
           <CheckCircle className="neon-text-cyan" />
           <div className="stat-content">
             <span className="label">PROFILE SCORE</span>
@@ -78,7 +78,7 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Main Actions */}
-        <div className="glass-card bento-item action-card reveal" style={{ animationDelay: '0.4s', gridColumn: 'span 2' }}>
+        <div className="glass-card bento-item action-card reveal reveal-d4 col-span-2">
           <div className="action-info">
             <h3 className="font-orbitron">FIND OPPORTUNITIES</h3>
             <p>Our AI has 12 new matches for your skill set.</p>
@@ -88,7 +88,7 @@ const DashboardPage: React.FC = () => {
           </button>
         </div>
 
-        <div className="glass-card bento-item ai-card reveal" style={{ animationDelay: '0.5s' }}>
+        <div className="glass-card bento-item ai-card reveal reveal-d5">
           <Sparkles className="neon-text-pink pulse" size={40} />
           <h3 className="font-orbitron">AI SCOUT</h3>
           <p>Analyze market pulse and career trends.</p>
@@ -96,7 +96,7 @@ const DashboardPage: React.FC = () => {
         </div>
 
         {/* Recent Activity */}
-        <div className="glass-card bento-item activity-card reveal" style={{ animationDelay: '0.6s', gridColumn: 'span 3' }}>
+        <div className="glass-card bento-item activity-card reveal reveal-d6 col-span-3">
           <div className="activity-header">
             <h3 className="font-orbitron">RECENT DEPLOYMENTS</h3>
             <button className="text-btn">VIEW ALL <ChevronRight size={16} /></button>
@@ -117,126 +117,6 @@ const DashboardPage: React.FC = () => {
         </div>
       </div>
 
-      <style>{`
-        .dashboard { padding-top: 8rem; padding-bottom: 5rem; }
-        .dashboard-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          margin-bottom: 3rem;
-        }
-        .profile-mini {
-          display: flex;
-          align-items: center;
-          gap: 1rem;
-          padding: 0.8rem 1.5rem;
-          border-radius: 40px;
-        }
-        .avatar {
-          width: 40px;
-          height: 40px;
-          background: var(--primary-neon);
-          color: #000;
-          border-radius: 50%;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          font-weight: 800;
-          font-family: 'Orbitron', sans-serif;
-        }
-        .profile-info { display: flex; flex-direction: column; }
-        .profile-info .name { font-weight: 700; font-size: 0.9rem; }
-        .profile-info .role { font-size: 0.7rem; color: var(--text-dim); }
-
-        .bento-grid {
-          display: grid;
-          grid-template-columns: repeat(3, 1fr);
-          gap: 1.5rem;
-        }
-        .bento-item {
-          padding: 2rem;
-          display: flex;
-          flex-direction: column;
-          justify-content: center;
-        }
-        .stat { flex-direction: row; align-items: center; gap: 1.5rem; }
-        .stat-content { display: flex; flex-direction: column; }
-        .stat-content .label { font-size: 0.65rem; color: var(--text-dim); font-family: 'Orbitron', sans-serif; }
-        .stat-content .value { font-size: 2rem; font-weight: 900; line-height: 1; }
-
-        .action-card {
-          flex-direction: row;
-          justify-content: space-between;
-          align-items: center;
-          background: linear-gradient(135deg, rgba(0, 245, 255, 0.05) 0%, rgba(255, 255, 255, 0.03) 100%);
-          border-color: rgba(0, 245, 255, 0.2);
-        }
-        .action-info h3 { font-size: 1.2rem; margin-bottom: 0.5rem; }
-        .action-info p { color: var(--text-dim); font-size: 0.9rem; }
-
-        .ai-card { align-items: center; text-align: center; gap: 1rem; }
-        .ai-card h3 { font-size: 1rem; }
-        .ai-card p { font-size: 0.8rem; color: var(--text-dim); }
-        .btn-sm { padding: 0.5rem 1.5rem; font-size: 0.7rem; }
-
-        .activity-card { justify-content: flex-start; }
-        .activity-header {
-          display: flex;
-          justify-content: space-between;
-          align-items: center;
-          margin-bottom: 2rem;
-        }
-        .text-btn {
-          background: none;
-          border: none;
-          color: var(--primary-neon);
-          font-family: 'Orbitron', sans-serif;
-          font-size: 0.7rem;
-          cursor: pointer;
-          display: flex;
-          align-items: center;
-        }
-        .activity-list { display: flex; flex-direction: column; gap: 1rem; }
-        .activity-item {
-          display: flex;
-          align-items: center;
-          gap: 1.5rem;
-          padding: 1rem;
-          background: rgba(255,255,255,0.02);
-          border-radius: 12px;
-          border: 1px solid transparent;
-          transition: all 0.3s ease;
-        }
-        .activity-item:hover {
-          background: rgba(255,255,255,0.05);
-          border-color: var(--glass-border);
-        }
-        .activity-icon { color: var(--text-dim); }
-        .activity-details { flex: 1; display: flex; flex-direction: column; }
-        .app-title { font-weight: 700; font-size: 0.95rem; }
-        .app-company { font-size: 0.8rem; color: var(--text-dim); }
-        .status-pill {
-          padding: 0.3rem 0.8rem;
-          border-radius: 20px;
-          font-size: 0.65rem;
-          font-weight: 800;
-          text-transform: uppercase;
-        }
-        .status-pill.accepted { background: rgba(57, 255, 20, 0.1); color: var(--accent-neon); border: 1px solid var(--accent-neon); }
-        .status-pill.pending { background: rgba(255, 215, 0, 0.1); color: #ffd700; border: 1px solid #ffd700; }
-        .app-date { font-size: 0.75rem; color: var(--text-dim); min-width: 80px; text-align: right; }
-
-        @media (max-width: 1024px) {
-          .bento-grid { grid-template-columns: repeat(2, 1fr); }
-          .activity-card { grid-column: span 2 !important; }
-        }
-        @media (max-width: 768px) {
-          .dashboard-header { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
-          .bento-grid { grid-template-columns: 1fr; }
-          .action-card, .activity-card { grid-column: span 1 !important; }
-          .action-card { flex-direction: column; align-items: flex-start; gap: 1.5rem; }
-        }
-      `}</style>
     </div>
   );
 };
