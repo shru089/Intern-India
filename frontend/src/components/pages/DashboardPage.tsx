@@ -32,18 +32,27 @@ const DashboardPage = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const [insights, setInsights] = React.useState<{ summary: string; recommendations: string[] } | null>(null);
-  const [loadingInsights, setLoadingInsights] = React.useState(false);
+  const [dashboardData, setDashboardData] = React.useState<any>(null);
+  const [loading, setLoading] = React.useState(false);
 
   React.useEffect(() => {
-    if (user?.id) {
-      const fetchInsights = async () => {
-        setLoadingInsights(true);
-        const data = await api.getCareerInsights(user.id!);
-        setInsights(data);
-        setLoadingInsights(false);
-      };
-      fetchInsights();
-    }
+    const fetchData = async () => {
+      if (!user?.id) return;
+      setLoading(true);
+      try {
+        const [insightsData, dashData] = await Promise.all([
+          api.getCareerInsights(user.id),
+          api.getStudentDashboard()
+        ]);
+        setInsights(insightsData);
+        setDashboardData(dashData);
+      } catch (err) {
+        console.error("Dashboard fetch error:", err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
   }, [user]);
 
   if (!user) return null;
@@ -90,7 +99,7 @@ const DashboardPage = () => {
                     <Sparkles className="text-yellow-400" size={24} />
                     <h3 className="text-xl font-bold text-white">AI Career Scout</h3>
                 </div>
-                {loadingInsights ? (
+                {loading ? (
                     <div className="flex-1 flex items-center justify-center">
                         <div className="w-6 h-6 border-2 border-primary border-t-transparent rounded-full animate-spin" />
                     </div>
@@ -101,7 +110,7 @@ const DashboardPage = () => {
                         </p>
                         {insights?.recommendations && (
                             <div className="space-y-2">
-                                {insights.recommendations.map((rec, i) => (
+                                {insights.recommendations.map((rec: string, i: number) => (
                                     <div key={i} className="flex items-center gap-2 text-xs text-neutral-400">
                                         <TrendingUp size={12} className="text-primary" />
                                         <span>{rec}</span>
@@ -115,27 +124,33 @@ const DashboardPage = () => {
           </BentoCard>
 
           <BentoCard className="row-span-2">
-             <ProfileCompletion completion={user.profileCompletion || 0} />
+             <ProfileCompletion completion={dashboardData?.stats?.profile_completion || user.profileCompletion || 0} />
           </BentoCard>
 
           <BentoCard className="lg:col-span-1 xl:col-span-2 row-span-2" onClick={() => navigate('/applied-internships')}>
              <div className="cursor-pointer h-full flex flex-col">
                 <div className="flex justify-between items-start mb-2">
                     <ListChecks className="text-secondary" size={28} />
-                    <span className="bg-secondary/20 text-secondary text-[10px] px-2 py-0.5 rounded-full font-bold">2 ACTIVE</span>
+                    <span className="bg-secondary/20 text-secondary text-[10px] px-2 py-0.5 rounded-full font-bold">
+                        {dashboardData?.stats?.applications_count || 0} ACTIVE
+                    </span>
                 </div>
                 <h3 className="text-xl font-bold text-white">Track Applications</h3>
                 <p className="text-neutral-400 mt-1">Status updates, interview calls and more.</p>
                 <div className="mt-auto pt-6">
                     <div className="space-y-3">
-                        <div className="flex justify-between items-center text-xs">
-                           <span className="text-neutral-300">Google Summer of Code</span>
-                           <span className="text-yellow-400 font-bold uppercase tracking-widest text-[8px]">In Review</span>
-                        </div>
-                        <div className="flex justify-between items-center text-xs">
-                           <span className="text-neutral-300">Indian Railways IT</span>
-                           <span className="text-green-400 font-bold uppercase tracking-widest text-[8px]">Shortlisted</span>
-                        </div>
+                        {dashboardData?.recent_applications?.length > 0 ? (
+                            dashboardData.recent_applications.map((app: any) => (
+                                <div key={app.id} className="flex justify-between items-center text-xs">
+                                   <span className="text-neutral-300 truncate max-w-[150px]">{app.title}</span>
+                                   <span className={`font-bold uppercase tracking-widest text-[8px] ${app.status === 'accepted' ? 'text-green-400' : 'text-yellow-400'}`}>
+                                      {app.status}
+                                   </span>
+                                </div>
+                            ))
+                        ) : (
+                            <p className="text-[10px] text-neutral-500 italic">No recent activity found.</p>
+                        )}
                     </div>
                 </div>
             </div>

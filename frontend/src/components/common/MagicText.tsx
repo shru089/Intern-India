@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 const MagicText = ({ text, className }) => {
   return (
     <h1 className={className}>
-      {text.split(' ').map((word, i) => (
+      {(text || '').split(' ').map((word, i) => (
         <motion.span
           key={i}
           initial={{ opacity: 0 }}

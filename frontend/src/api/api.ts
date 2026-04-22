@@ -108,11 +108,21 @@ export const api = {
 
   sendMessageToChatbot: async (message: string): Promise<string> => {
     try {
-      const { data } = await apiClient.post("/ai-engine/chatbot/query", { message });
+      const { data } = await apiClient.post("/ai/chatbot/query", { message });
       return data.answer;
     } catch (error) {
       console.error("API Error - sendMessageToChatbot:", error);
       return "I'm having trouble connecting to the AI brain right now. Please try again later.";
+    }
+  },
+
+  getStudentDashboard: async (): Promise<any> => {
+    try {
+      const { data } = await apiClient.get("/students/dashboard");
+      return data;
+    } catch (error) {
+      console.error("API Error - getStudentDashboard:", error);
+      return null;
     }
   },
 };

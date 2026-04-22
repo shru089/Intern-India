@@ -10,13 +10,45 @@ GET  /students/recommendations — Get AI-ranked internship recommendations
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from database import get_db
-from models import Internship, StudentProfile, UserSQL
+from models import Internship, StudentProfile, Application, UserSQL
 from schemas.student import StudentProfileCreate, RecommendationList, Recommendation
 from routers.auth import get_current_user
 
 from services.matching import score_internship
 
 router = APIRouter()
+
+
+@router.get("/dashboard")
+async def student_dashboard(
+    current_user: UserSQL = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Returns summary stats for the student dashboard."""
+    # Applications
+    app_count = db.query(Application).filter(Application.student_email == current_user.email).count()
+    recent_apps = db.query(Application).filter(Application.student_email == current_user.email).order_by(Application.applied_at.desc()).limit(2).all()
+    
+    # Recommendations (simplified top matches)
+    prof = db.query(StudentProfile).filter(StudentProfile.user_email == current_user.email).first()
+    matches_count = db.query(Internship).count() if prof else 0
+    
+    return {
+        "stats": {
+            "applications_count": app_count,
+            "matches_count": matches_count,
+            "profile_completion": getattr(prof, "profile_completion", 70) if prof else 0
+        },
+        "recent_applications": [
+            {
+                "id": app.id,
+                "title": db.query(Internship).get(app.internship_id).title if db.query(Internship).get(app.internship_id) else "Unknown",
+                "status": app.status,
+                "applied_at": app.applied_at
+            }
+            for app in recent_apps
+        ]
+    }
 
 
 # ── Profile ───────────────────────────────────────────────────────────────────
