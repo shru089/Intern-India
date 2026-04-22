@@ -72,8 +72,8 @@ const DashboardPage = () => {
             <p className="text-neutral-400">Welcome back, {(user.fullName || user.email || 'User').split(' ')[0]}!</p>
           </div>
           <div className="flex items-center gap-4">
-             <button className="glass-card p-3 rounded-full hover:text-primary"><Bell size={20}/></button>
-             <button className="glass-card p-3 rounded-full hover:text-primary"><Settings size={20}/></button>
+             <button className="glass-card p-3 rounded-full hover:text-primary" aria-label="Notifications"><Bell size={20}/></button>
+             <button className="glass-card p-3 rounded-full hover:text-primary" aria-label="Settings"><Settings size={20}/></button>
           </div>
         </div>
 
