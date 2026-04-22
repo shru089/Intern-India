@@ -1,13 +1,14 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
-import { motion } from 'framer-motion';
+import { motion, HTMLMotionProps } from 'framer-motion';
 import { Search, ListChecks, Bell, Settings, Sparkles, TrendingUp, Award } from 'lucide-react';
+import { api } from '../../api/api';
 import { useAuth } from '../hooks/useAuth';
 import PageWrapper from '../layout/PageWrapper';
 import ProfileCompletion from '../common/ProfileCompletion';
 import MagicText from '../common/MagicText';
 
-interface BentoCardProps extends React.HTMLAttributes<HTMLDivElement> {
+interface BentoCardProps extends HTMLMotionProps<"div"> {
   children: React.ReactNode;
 }
 
