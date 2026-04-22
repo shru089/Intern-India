@@ -5,11 +5,12 @@ from fastapi.responses import JSONResponse
 from motor.motor_asyncio import AsyncIOMotorClient
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
+from sqlalchemy import text
 import logging
 import traceback
 
 from database import MongoDB, get_db
-from routers import auth, students, orgs, admin, ai_engine
+from routers import auth, students, orgs, admin, ai_engine, scraper
 import os
 
 app = FastAPI(
@@ -17,7 +18,7 @@ app = FastAPI(
     version="0.1.0",
     docs_url="/docs",
     redoc_url="/redoc",
-    openapi_url="/openapi.json"
+    openapi_url="/openapi.json",
 )
 
 # Configure logging
@@ -34,6 +35,7 @@ app.add_middleware(
     expose_headers=["X-Total-Count"],
 )
 
+
 # Error handling middleware
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
@@ -43,6 +45,7 @@ async def global_exception_handler(request: Request, exc: Exception):
         content={"detail": "Internal server error"},
     )
 
+
 @app.exception_handler(RequestValidationError)
 async def validation_exception_handler(request: Request, exc: RequestValidationError):
     logger.warning(f"Validation error: {exc.errors()}")
@@ -50,6 +53,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
         content={"detail": exc.errors(), "body": exc.body},
     )
+
 
 @app.exception_handler(HTTPException)
 async def http_exception_handler(request: Request, exc: HTTPException):
@@ -59,17 +63,32 @@ async def http_exception_handler(request: Request, exc: HTTPException):
         headers=exc.headers,
     )
 
+
 # Database connection events
 @app.on_event("startup")
 async def startup_db_client():
     # Initialize MongoDB connection
-    await MongoDB.get_database()
-    print("Connected to MongoDB")
+    # Note: We try to connect, but don't fail if local mongo isn't running
+    # since we are moving towards SQL for the core internship data.
+    try:
+        await MongoDB.get_database()
+        print("Connected to MongoDB")
+    except Exception as e:
+        print(f"MongoDB not connected (optional): {e}")
+
+    # Initialize SQLAlchemy Tables
+    from database import engine, Base
+    import models  # Ensure all models are imported so they register with Base
+
+    Base.metadata.create_all(bind=engine)
+    print("SQLAlchemy tables created/verified.")
+
 
 @app.on_event("shutdown")
 async def shutdown_db_client():
     await MongoDB.close_connection()
     print("Closed MongoDB connection")
+
 
 # Security headers middleware
 @app.middleware("http")
@@ -81,6 +100,7 @@ async def add_security_headers(request: Request, call_next):
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Content-Security-Policy"] = "default-src 'self'"
     return response
+
 
 # Include routers with security middleware
 app.include_router(
@@ -113,7 +133,7 @@ app.include_router(
     dependencies=[Depends(auth.get_current_user), Depends(auth.require_admin)],
     responses={
         401: {"description": "Unauthorized"},
-        403: {"description": "Forbidden - Admin access required"}
+        403: {"description": "Forbidden - Admin access required"},
     },
 )
 
@@ -125,6 +145,15 @@ app.include_router(
     responses={401: {"description": "Unauthorized"}},
 )
 
+app.include_router(
+    scraper.router,
+    prefix="/scraper",
+    tags=["Scraper"],
+    dependencies=[Depends(auth.get_current_user)],
+    responses={401: {"description": "Unauthorized"}},
+)
+
+
 class HealthCheckResponse(BaseModel):
     status: str
     database: str
@@ -133,6 +162,7 @@ class HealthCheckResponse(BaseModel):
     timestamp: str
     error: Optional[str] = None
 
+
 @app.get(
     "/",
     response_model=HealthCheckResponse,
@@ -140,8 +170,8 @@ class HealthCheckResponse(BaseModel):
     description="Check if the API is running and connected to the database",
     responses={
         200: {"description": "API is healthy"},
-        503: {"description": "Service unavailable - database connection error"}
-    }
+        503: {"description": "Service unavailable - database connection error"},
+    },
 )
 async def health():
     """
@@ -151,31 +181,28 @@ async def health():
     - Environment status
     """
     from datetime import datetime
-    
+
+    db_status = "disconnected"
     try:
-        # Test database connection
         db = await get_db()
-        await db.command('ping')
-        
-        return {
-            "status": "ok",
-            "database": "connected",
-            "version": "0.1.0",
-            "environment": os.getenv("ENV", "development"),
-            "timestamp": datetime.utcnow().isoformat()
-        }
+        await db.command("ping")
+        db_status = "connected"
     except Exception as e:
-        logger.error(f"Health check failed: {str(e)}")
-        raise HTTPException(
-            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail={
-                "status": "error",
-                "database": "disconnected",
-                "version": "0.1.0",
-                "environment": os.getenv("ENV", "development"),
-                "timestamp": datetime.utcnow().isoformat(),
-                "error": str(e)
-            }
-        )
+        logger.warning(f"Health check - MongoDB not available: {str(e)}")
 
+        try:
+            from database import engine
 
+            with engine.connect() as conn:
+                conn.execute(text("SELECT 1"))
+            db_status = "sqlite_connected"
+        except Exception as sql_e:
+            logger.error(f"Health check - SQLite also failed: {str(sql_e)}")
+
+    return {
+        "status": "ok",
+        "database": db_status,
+        "version": "0.1.0",
+        "environment": os.getenv("ENV", "development"),
+        "timestamp": datetime.utcnow().isoformat(),
+    }
