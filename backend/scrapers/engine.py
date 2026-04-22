@@ -53,27 +53,28 @@ class ScraperEngine:
     def _process_listings(self, listings: List[dict]):
         new_count = 0
         for data in listings:
-            # Deduplication: check if source_url or external_id exists
+            # Listings arrive already standardized from BaseScraper.standardize()
+            # so keys are: source_url, external_id, company_name, etc.
             existing = (
                 self.db.query(Internship)
                 .filter(
-                    (Internship.source_url == data["url"])
-                    | (Internship.external_id == data["id"])
+                    (Internship.source_url == data.get("source_url"))
+                    | (Internship.external_id == data.get("external_id"))
                 )
                 .first()
             )
 
             if not existing:
                 internship = Internship(
-                    title=data["title"],
-                    company_name=data["company"],
+                    title=data.get("title"),
+                    company_name=data.get("company_name"),
                     location=data.get("location"),
                     stipend=str(data.get("stipend", "Not Specified")),
-                    duration_months=data.get("duration"),
-                    required_skills=",".join(data.get("skills", [])),
-                    source=data["source"],
-                    source_url=data["url"],
-                    external_id=data["id"],
+                    duration_months=data.get("duration_months"),
+                    required_skills=data.get("required_skills", ""),
+                    source=data.get("source"),
+                    source_url=data.get("source_url"),
+                    external_id=data.get("external_id"),
                     posted_at=data.get("posted_at"),
                     is_government=data.get("is_government", False),
                     rural_quota=data.get("rural_quota", False),

@@ -16,6 +16,8 @@ Key selectors (verified live on 2026-04-15):
 """
 
 import logging
+import random
+import time
 from datetime import datetime
 from bs4 import BeautifulSoup
 from typing import List, Dict, Any

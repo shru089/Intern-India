@@ -70,8 +70,10 @@ class AICTEScraper(BaseScraper):
                 else ""
             )
 
+            import hashlib
+            stable_id = hashlib.md5(f"{title}|{company}|{apply_url}".encode()).hexdigest()[:16]
             return {
-                "id": f"aicte_{hash(title + company) % 1000000}",
+                "id": f"aicte_{stable_id}",
                 "title": title,
                 "company": company,
                 "location": location,
